@@ -1,290 +1,151 @@
 #ifndef PLOTTINGUTILS_HXX_SEEN
 #define PLOTTINGUTILS_HXX_SEEN
 
+#include <initializer_list>
+#include <vector>
+#include <sstream>
+#include <iomanip>
+
+#include "TAxis.h"
+#include "TH1.h"
+#include "TCanvas.h"
+#include "TLatex.h"
+#include "TLegend.h"
+#include "TStyle.h"
+#include "TColor.h"
+
 namespace {
   int Verbosity = 0;
 }
 
 namespace PlottingDefaults {
-  double const TopPaneXLabelOffset = 50;
-  double const TopPaneXTitleOffset = 50;
-  double const TopPaneYLabelOffset = 0.001;
-  double const TopPaneYTitleOffset = 0.45;
+  constexpr double TopPaneXLabelOffset = 50;
+  constexpr double TopPaneXTitleOffset = 50;
+  constexpr double TopPaneYLabelOffset = 0.01;
+  constexpr double TopPaneYTitleOffset = 0.45;
 
-  double const BottomPaneXLabelOffset = 0.005;
-  double const BottomPaneXTitleOffset = 0.7;
-  double const BottomPaneYLabelOffset = 0.001;
-  double const BottomPaneYTitleOffset = 0.45;
+  constexpr double BottomPaneXLabelOffset = 0.005;
+  constexpr double BottomPaneXTitleOffset = 0.7;
+  constexpr double BottomPaneYLabelOffset = 0.001;
+  constexpr double BottomPaneYTitleOffset = 0.45;
 
-  double const YLabelOffset = 0.004;
-  double const YTitleOffset = 0.75;
-  double const XLabelOffset = 0.005;
-  double const XTitleOffset = 0.9;
+  constexpr double YLabelOffset = 0.004;
+  constexpr double YTitleOffset = 1.5;
+  constexpr double XLabelOffset = 0.005;
+  constexpr double XTitleOffset = 1.0;
 
-  double const Pad0YMargin = 0.135;
-  double const Pad0XMargin = 0.135;
+  constexpr double Pad0YMargin = 0.135;
+  constexpr double Pad0XMargin = 0.135;
 
-  double const Pad1YMargin = 0.12;
-  double const Pad1XMargin = 0.12;
+  constexpr double Pad1YMargin = 0.12;
+  constexpr double Pad1XMargin = 0.12;
 
-  double const P0LegendWidth = 0.2;
-  double const P0LegendHeight = 0.2;
+  constexpr double P0LegendWidth = 0.2;
+  constexpr double P0LegendHeight = 0.2;
 
-  double const P1LegendWidth = 0.2;
-  double const P1LegendHeight = 0.36;
+  constexpr double P1LegendWidth = 0.2;
+  constexpr double P1LegendHeight = 0.36;
 
-  double TitleX0 = 0.3;
-  double TitleY0 = 0.95;
-  double TitleTextSize = 0.04;
+  constexpr double TitleX0 = 0.3;
+  constexpr double TitleY0 = 0.95;
+  constexpr double TitleTextSize = 0.04;
 
-  bool const DoLogx = false;
-  bool const DoLogy = false;
+  constexpr bool DoLogx = false;
+  constexpr bool DoLogy = false;
 
-  double MinYVal = ((!DoLogy)?0.0:1E-5);
+  constexpr Float_t MinYVal = ((!DoLogy)?0.0:1E-5);
+  constexpr Float_t YStretchFactor = 1.2;
 
-  char const * DPhiTTitle = "#delta#phi_{T} [rad]";
-  char const * DPhiT_PDF_Title = "#frac{dN}{Nd#delta#phi_{T}}";
+  constexpr char const * DPhiTTitle = "#delta#phi_{T} [degrees]";
+  constexpr char const * DPhiT_PDF_Title = "#frac{dN}{Nd#delta#phi_{T}}";
+
+  constexpr char const * DAlphaTTitle = "#delta#alpha_{T} [degrees]";
+  constexpr char const * DAlphaT_PDF_Title = "#frac{dN}{Nd#delta#alpha_{T}}";
+
+  constexpr char const * DPTTitle = "#delta p_{T} [MeV/C]";
+  constexpr char const * DPT_PDF_Title = "#frac{dN}{Nd#delta p_{T}}";
+
 }
 
 namespace PlottingUtils {
 
-//**********START*****************TH1F Utils***********************************/
+//**********START*****************TH1 Utils***********************************/
 
 ///Adjusts input TAxis to to log bins. Left edge is either the current or if
 ///less than epsilon = 1E-12, it is set to epsilon.
-bool BinLogX(TAxis* axis){
-  static double const epsilon = 1E-12;
-  int const bins = axis->GetNbins();
+bool BinLogX(TAxis* axis);
 
-  double const from = axis->GetXmin();
-  double const to = axis->GetXmax();
-  if (from < epsilon) return false;
-  Double_t *new_bins = new Double_t[bins + 1];
-
-  new_bins[0] = from;
-  const Double_t factor = TMath::Power(to/from, 1./bins);
-
-  for (int i = 1; i <= bins; i++) {
-   new_bins[i] = factor * new_bins[i-1];
-  }
-  axis->Set(bins, new_bins);
-  delete [] new_bins;
-  return true;
-}
-
-///Makes a clone of a TH1F and sets it to be not saved.
+///Makes a clone of a T and sets it to be not saved.
 ///It is obviously, therefore, your job to delete it
-TH1F* NoSaveClone(TH1F const * const &inp){
-  TH1F* clone = static_cast<TH1F*>(inp->Clone());
+template<typename T>
+T* NoSaveClone(T const * const &inp){
+  T* clone = static_cast<T*>(inp->Clone());
   clone->SetName((std::string(clone->GetName())+"_c").c_str());
   clone->SetDirectory(0);
   return clone;
 }
 
-///Ease of use interface for NoSaveClone(TH1F const * const)
-TH1F* NoSaveClone(const TH1F& inp){
-  return(NoSaveClone(&inp));
-}
 
 ///Scales scaled bin-by-bin to ref, errors on both are scaled by the bin
 ///value of ref as well.
-std::pair<TH1F*,TH1F*>
-ScaleToRef(const TH1F& scaled, const TH1F& ref){
-  if(ref.GetNbinsX() != scaled.GetNbinsX()){
-    std::cerr << "Error: bin num not consistent: Ref("
-      << ref.GetNbinsX() << "), scaled(" << scaled.GetNbinsX()
-      << ")." << std::endl;
-    return std::pair<TH1F*,TH1F*>(0,0);
-  }
-  TH1F* refClone = NoSaveClone(ref);
-  TH1F* scaledClone = NoSaveClone(scaled);
+std::pair<TH1*,TH1*>
+ScaleToRef(const TH1& scaled, const TH1& ref);
 
-  for(int i = 1; i < ref.GetNbinsX() + 1; ++i){
-    float rbc = ref.GetBinContent(i);
-    refClone->SetBinContent(i,1.0);
-    refClone->SetBinError(i,ref.GetBinError(i)/rbc);
-    scaledClone->SetBinContent(i,scaled.GetBinContent(i)/rbc);
-    scaledClone->SetBinError(i,scaled.GetBinError(i)/rbc);
-  }
-  return std::pair<TH1F*,TH1F*>(scaledClone,refClone);
-}
-
-///Ease of use interface for ScaleToRef(const TH1F& scaled, const TH1F& ref)
-std::pair<TH1F*,TH1F*>
-ScaleToRef(const TH1F* scaled, const TH1F* ref){
-  return ScaleToRef(*scaled,*ref);
-}
+///Ease of use interface for ScaleToRef(const TH1& scaled, const TH1& ref)
+std::pair<TH1*,TH1*>
+ScaleToRef(const TH1* scaled, const TH1* ref);
 
 ///Divides the contents and error of each bin by with width of the
 //bin
-void BinWidthNormalise(TH1F* th){
-  for(int i = 1; i < th->GetNbinsX() + 1; ++i){
-    float bc = th->GetBinContent(i);
-    bc /= th->GetBinWidth(i);
-    th->SetBinContent(i,bc);
-
-    float be = th->GetBinError(i);
-    be /= th->GetBinWidth(i);
-    th->SetBinError(i,be);
-  }
-}
+void BinWidthNormalise(TH1* th);
 
 ///Divides the contents and error of each bin by the total populations,
 ///including the under and overflow bins.
-void AreaNormalise(TH1F* th){
-  double integral = th->Integral(0, th->GetNbinsX() + 1);
-
-  for(int i = 1; i < th->GetNbinsX() + 1; ++i){
-    float bc = th->GetBinContent(i);
-    bc /= integral;
-    th->SetBinContent(i,bc);
-
-    float be = th->GetBinError(i);
-    be /= integral;
-    th->SetBinError(i,be);
-  }
-}
+void AreaNormalise(TH1* th);
 
 ///Combines the functions of BinWidthNormalise and AreaNormalise and adds
 ///some debugging output
-void MakePDF(TH1F* th){
-  double integral = th->Integral(0, th->GetNbinsX() + 1);
+void MakePDF(TH1* th);
 
-  std::cout << th->GetName() << "(" << integral << ")" << std::endl;
-
-  for(int i = 1; i < th->GetNbinsX() + 1; ++i){
-    float bc = th->GetBinContent(i);
-    float pbc = bc;
-    bc /= (th->GetBinWidth(i)*integral);
-    th->SetBinContent(i,bc);
-
-    float be = th->GetBinError(i);
-    float pbe = be;
-    be /= (th->GetBinWidth(i)*integral);
-    th->SetBinError(i,be);
-
-    if(Verbosity > 1){
-      std::cout << "\t" << "(" << th->GetBinLowEdge(i) << ")[ "
-        << pbc << " +- " << pbe << "  -> " << bc << " +- " << be << "]("
-        << th->GetBinLowEdge(i+1) << ") bw ("
-        << (th->GetBinLowEdge(i+1) - th->GetBinLowEdge(i))
-        << ":" << th->GetBinWidth(i) << ")" << std::endl;
-    }
-  }
-}
-
-inline double GetMaximumBinContents(TH1F const * inp){
+inline double GetMaximumBinContents(TH1 const * inp){
   return inp->GetBinContent(inp->GetMaximumBin());
 }
-
-//***********END******************TH1F Utils***********************************/
+//***********END******************TH1 Utils***********************************/
 
 //**********START***************Factory Utils**********************************/
 
 ///Creates a standard canvas with two sub TPads.
-TCanvas* SplitCanvasFactory(char const * CanvName="SplitCanvas"){
-  TCanvas* canv = new TCanvas(CanvName,"");
-  canv->SetTopMargin(0);
-  canv->SetBottomMargin(0);
-  canv->SetLeftMargin(0);
-  canv->SetRightMargin(0);
-  TVirtualPad* P0 = canv->GetPad(0);
+TCanvas* SplitCanvasFactory(std::string const &CanvName="SplitCanvas");
 
-  P0->Divide(1,2,0,0);
+TCanvas* CanvasFactory(std::string const &CanvName="Canvas",
+  bool logx=PlottingDefaults::DoLogx);
 
-  TVirtualPad* P1 = P0->GetPad(1);
-
-  P1->SetTopMargin(PlottingDefaults::Pad1YMargin);
-  P1->SetBottomMargin(PlottingDefaults::Pad1YMargin);
-
-  P1->SetLeftMargin(PlottingDefaults::Pad1XMargin);
-  P1->SetRightMargin(PlottingDefaults::Pad1XMargin);
-  P1->SetLogx(PlottingDefaults::DoLogx);
-
-  TVirtualPad* P2 = P0->GetPad(2);
-
-  P2->SetTopMargin(PlottingDefaults::Pad1YMargin);
-  P2->SetBottomMargin(PlottingDefaults::Pad1YMargin);
-
-  P2->SetLeftMargin(PlottingDefaults::Pad1XMargin);
-  P2->SetRightMargin(PlottingDefaults::Pad1XMargin);
-  P2->SetLogx(PlottingDefaults::DoLogx);
-
-  return canv;
-}
-
-TCanvas* CanvasFactory(char const * CanvName="Canvas",
-  bool logx=PlottingDefaults::DoLogx){
-  TCanvas* canv = new TCanvas(CanvName,"");
-  canv->SetTopMargin(0);
-  canv->SetBottomMargin(0);
-  canv->SetLeftMargin(0);
-  canv->SetRightMargin(0);
-  TVirtualPad* P0 = canv->GetPad(0);
-
-  P0->SetTopMargin(PlottingDefaults::Pad0YMargin);
-  P0->SetBottomMargin(PlottingDefaults::Pad0YMargin);
-  P0->SetLeftMargin(PlottingDefaults::Pad0XMargin);
-  P0->SetRightMargin(PlottingDefaults::Pad0XMargin);
-  P0->SetBorderMode(-1);
-  P0->SetBorderSize(0);
-  P0->SetLogx(logx);
-
-  return canv;
-}
-
-TLatex* TitleFactory(char const * TitleText="TitleBeHere",
+TLatex* TitleFactory(std::string const &TitleText="TitleBeHere",
   double x0=PlottingDefaults::TitleX0,
   double y0=PlottingDefaults::TitleY0,
-  float TextSize=PlottingDefaults::TitleTextSize){
-  TLatex* title = new TLatex(x0,y0, TitleText);
-  title->SetTextSize(TextSize);
-  title->SetNDC();
-  return title;
-}
+  float TextSize=PlottingDefaults::TitleTextSize);
 
 ///Where legends are made
-TLegend* LegendFactory(float lx0,float ly0,float lx1,float ly1){
-  TLegend* leg = new TLegend(lx0,ly0,lx1,ly1);
-  leg->SetFillColor(kWhite);
-  return leg;
-}
+TLegend* LegendFactory(float lx0,float ly0,float lx1,float ly1);
 
 //***********END****************Factory Utils**********************************/
 
 //**********START**********Pretty Defaults Functions***************************/
 
-void SetUpperPaneHistoDefaults(TH1F* hist, char const * ytitle="",
-  char const * xtitle=""){
-  hist->GetYaxis()->SetTitleOffset(PlottingDefaults::TopPaneYTitleOffset);
-  hist->GetYaxis()->SetLabelOffset(PlottingDefaults::TopPaneYLabelOffset);
-  hist->GetXaxis()->SetTitleOffset(PlottingDefaults::TopPaneXTitleOffset);
-  hist->GetXaxis()->SetLabelOffset(PlottingDefaults::TopPaneXLabelOffset);
-  hist->GetYaxis()->SetTitle(ytitle);
-  hist->GetXaxis()->SetTitle(xtitle);
-}
+void SetUpperPaneHistoDefaults(TH1* hist, char const * ytitle="",
+  char const * xtitle="");
 
-void SetLowerPaneHistoDefaults(TH1F* hist, char const * ytitle="",
-  char const * xtitle=""){
-  hist->GetYaxis()->SetTitleOffset(PlottingDefaults::BottomPaneYTitleOffset);
-  hist->GetYaxis()->SetLabelOffset(PlottingDefaults::BottomPaneYLabelOffset);
-  hist->GetXaxis()->SetTitleOffset(PlottingDefaults::BottomPaneXTitleOffset);
-  hist->GetXaxis()->SetLabelOffset(PlottingDefaults::BottomPaneXLabelOffset);
-  hist->GetYaxis()->SetTitle(ytitle);
-  hist->GetXaxis()->SetTitle(xtitle);
-}
+void SetLowerPaneHistoDefaults(TH1* hist, char const * ytitle="",
+  char const * xtitle="");
 
-void SetOnePaneHistDefaults(TH1F* hist,
-  char const * title=PlottingDefaults::DPhiTTitle){
-  hist->GetXaxis()->SetTitle(title);
-  hist->GetXaxis()->SetTitleOffset(PlottingDefaults::XTitleOffset);
-  hist->GetXaxis()->SetLabelOffset(PlottingDefaults::XLabelOffset);
-}
+void SetOnePaneHistDefaults(TH1* hist,
+  char const * Ytitle=PlottingDefaults::DPhiT_PDF_Title,
+  char const * Xtitle=PlottingDefaults::DPhiTTitle);
 
 //***********END***********Pretty Defaults Functions***************************/
 
 // Notes on Usage:
-//   The TH1F*s wil be Added to the legend and plotted as is, you need to set up
+//   The TH1*s wil be Added to the legend and plotted as is, you need to set up
 //   any styling, titles, and axes ranges beforehand.
 //   (myth->GetYaxis()->SetUserRange(low,high).
 
@@ -298,84 +159,181 @@ void SetOnePaneHistDefaults(TH1F* hist,
 //   Currently the inset can only be anchored to the top right. I will add final
 //   positioning later.
 TCanvas* GetInsetCanvas(
-  std::vector<TH1F*> &MainPlotSeries,
-  std::vector<TH1F*> &InsetSeries,
+  std::vector<TH1*> &MainPlotSeries,
+  std::vector<TH1*> &InsetSeries,
   float MainXMargin=0.15, float MainYMargin=0.15,
   float InsetWidth=0.4, float InsetHeight=0.3,
-  float LegendWidth=0.18, float LegendHeight=0.2,
+  float LegendWidth=0.25, float LegendHeight=0.25,
   bool LegendOnLeft=false, bool LegendOnTop=false,
   float InsetLMargin=0.135, float InsetRMargin=0.018,
   float InsetTMargin=0.02, float InsetBMargin=0.135,
-  float LegendClosestXMargin=0.015, float LegendClosestYMargin=0.015){
+  float LegendClosestXMargin=0.018, float LegendClosestYMargin=0.05);
 
-  TCanvas* canv = new TCanvas("CallMeWhatYouWill","");
-
-  canv->SetTopMargin(0);
-  canv->SetBottomMargin(0);
-  canv->SetLeftMargin(0);
-  canv->SetRightMargin(0);
-  canv->SetBorderMode(-1);
-  canv->SetBorderSize(0);
-  TVirtualPad* P0 = canv->GetPad(0);
-
-  P0->SetTopMargin(MainYMargin);
-  P0->SetBottomMargin(MainYMargin);
-  P0->SetLeftMargin(MainXMargin);
-  P0->SetRightMargin(MainXMargin);
-  P0->SetBorderMode(-1);
-  P0->SetBorderSize(0);
-
-  float LegX0,LegX1,LegY0,LegY1;
-
-  if(LegendOnLeft){
-    LegX0 = MainXMargin + LegendClosestXMargin;
-    LegX1 = MainXMargin + LegendWidth + LegendClosestXMargin;
-  } else {
-    LegX0 = 1.0 - MainXMargin - LegendWidth - LegendClosestXMargin;
-    LegX1 = 1.0 - MainXMargin - + LegendClosestXMargin;
+inline void MakePDF(std::initializer_list<TH1 *> const histos){
+  for(auto const & histo : histos){
+    MakePDF(histo);
   }
-  if(LegendOnTop){
-    LegY0 = 1.0 - MainYMargin - LegendHeight - LegendClosestYMargin;
-    LegY1 = 1.0 - MainYMargin - LegendClosestYMargin;
-  } else {
-    LegY0 = MainYMargin + LegendClosestYMargin;
-    LegY1 = MainYMargin + LegendHeight + LegendClosestYMargin;
+}
+
+inline Float_t GetLargestYVal(std::initializer_list<TH1 *> const histos){
+  Float_t max = 0;
+  for(auto const & histo : histos){
+    Float_t esto = GetMaximumBinContents(histo) ;
+    max = esto > max ? esto : max;
   }
+  return max;
+}
 
-  TLegend* leg = new TLegend(LegX0,LegY0,LegX1,LegY1);
-  leg->SetFillColor(kWhite);
-
-  for(std::vector<TH1F*>::iterator main_plots_it = MainPlotSeries.begin();
-    main_plots_it != MainPlotSeries.end(); ++main_plots_it){
-
-    (*main_plots_it)->Draw((main_plots_it==MainPlotSeries.begin())?"EHIST":
-      "EHIST SAME");
-    leg->AddEntry(*main_plots_it,(*main_plots_it)->GetTitle(), "l");
+inline void SetUserRangeToMaxYVal(std::initializer_list<TH1*> histos,
+  Float_t minval=0xDEADDEAD){
+  Float_t ymin = (minval==0xDEADDEAD)?PlottingDefaults::MinYVal:minval;
+  Float_t max = GetLargestYVal(histos);
+  for(auto & histo : histos){
+    histo->GetYaxis()->SetRangeUser(ymin,
+      max*PlottingDefaults::YStretchFactor);
   }
-  leg->Draw();
+}
 
-  TPad *insetPad = new TPad("inset","",
-    (1.0 - MainXMargin - InsetWidth - InsetLMargin - InsetRMargin),
-    (1.0 - MainYMargin - InsetHeight - InsetTMargin - InsetBMargin),
-    (1.0 - MainXMargin - InsetRMargin),
-    (1.0 - MainYMargin - InsetTMargin));
-  insetPad->SetRightMargin(InsetRMargin);
-  insetPad->SetLeftMargin(InsetLMargin);
-  insetPad->SetTopMargin(InsetTMargin);
-  insetPad->SetBottomMargin(InsetBMargin);
+//Splits an input string over multiple lines of a given width. Does't try
+//anything clever so will happily split a word in half.
+inline std::string ConfineWidthStringWithIndent(
+  const char* indent, std::string inp,
+  int width=50,
+  const char* firstindent=""){
 
-  insetPad->Draw();
-  insetPad->cd();
+  std::stringstream ss("");
 
-  for(std::vector<TH1F*>::iterator inset_plots_it = InsetSeries.begin();
-    inset_plots_it != InsetSeries.end(); ++inset_plots_it){
-
-    (*inset_plots_it)->Draw((inset_plots_it==InsetSeries.begin())?"EHIST":
-      "EHIST SAME");
+  ss << firstindent;
+  int sslen = 0;
+  while(true){
+    ss << inp.substr(sslen,width);
+    if((sslen+width) < inp.length()){
+      ss << "\n" << indent;
+      sslen += width;
+    } else {
+      break;
+    }
   }
+  return ss.str();
+}
 
-  return canv;
+inline std::string GetIntegralAsString(TH1 const * hist){
+  std::stringstream ss("");
+  ss << std::setprecision(2) << hist->Integral();
+  return ss.str();
+}
+
+inline void AddCountToTHTitle(
+  std::initializer_list< std::pair< char const*, TH1*> >histos){
+  for(auto const &namepair : histos){
+    namepair.second->SetTitle((std::string(namepair.first) + " ("
+      + GetIntegralAsString(namepair.second) + ")").c_str());
+  }
+}
+
+inline void DrawTHs(std::initializer_list<TH1*> histos,
+  std::string drawOpt="EHIST"){
+  for(std::initializer_list<TH1*>::iterator th_it = histos.begin();
+    th_it != histos.end(); ++th_it){
+    (*th_it)->Draw((drawOpt+(th_it!=histos.begin()?" SAME":"")).c_str());
+  }
+}
+
+inline void AddToLegend(std::initializer_list<TH1*> histos, TLegend* leg,
+  char const * drawOpt="l"){
+  for(auto const &hist : histos){
+    leg->AddEntry(hist,hist->GetTitle(),drawOpt);
+  }
+}
+
+inline TStyle* MakeT2KStyle(){
+  TStyle *t2kStyle = new TStyle("T2K","T2K approved plots style");
+
+  // use plain black on white colors
+  t2kStyle->SetFrameBorderMode(0);
+  t2kStyle->SetCanvasBorderMode(0);
+  t2kStyle->SetPadBorderMode(0);
+  t2kStyle->SetPadColor(0);
+  t2kStyle->SetCanvasColor(0);
+  t2kStyle->SetStatColor(0);
+  t2kStyle->SetFillColor(0);
+  t2kStyle->SetLegendBorderSize(1);
+
+  // set the paper & margin sizes
+  t2kStyle->SetPaperSize(20,26);
+
+  // use large Times-Roman fonts
+  t2kStyle->SetTextFont(132);
+  t2kStyle->SetTextSize(0.15);
+  t2kStyle->SetLabelFont(132,"x");
+  t2kStyle->SetLabelFont(132,"y");
+  t2kStyle->SetLabelFont(132,"z");
+  t2kStyle->SetLabelSize(0.07,"x");
+  t2kStyle->SetTitleSize(0.07,"x");
+  t2kStyle->SetLabelSize(0.07,"y");
+  t2kStyle->SetTitleSize(0.07,"y");
+  t2kStyle->SetLabelSize(0.07,"z");
+  t2kStyle->SetTitleSize(0.07,"z");
+  t2kStyle->SetLabelFont(132,"t");
+  t2kStyle->SetTitleFont(132,"x");
+  t2kStyle->SetTitleFont(132,"y");
+  t2kStyle->SetTitleFont(132,"z");
+  t2kStyle->SetTitleFont(132,"t");
+  t2kStyle->SetTitleFillColor(0);
+  t2kStyle->SetTitleX(0.25);
+  t2kStyle->SetTitleFontSize(0.1);
+  t2kStyle->SetTitleFont(132,"pad");
+
+  // use bold lines and markers
+  t2kStyle->SetMarkerStyle(20);
+  t2kStyle->SetHistLineWidth(1.85);
+  t2kStyle->SetLineStyleString(2,"[12 12]"); // postscript dashes
+
+  // get rid of X error bars and y error bar caps
+  t2kStyle->SetErrorX(0.001);
+
+  // do not display any of the standard histogram decorations
+  t2kStyle->SetOptTitle(0);
+  t2kStyle->SetOptStat(0);
+  t2kStyle->SetOptFit(0);
+
+  // put tick marks on top and RHS of plots
+  t2kStyle->SetPadTickX(1);
+  t2kStyle->SetPadTickY(1);
+
+  // Add a greyscale palette for 2D plots
+  int ncol=50;
+  double dcol = 1./float(ncol);
+  double gray = 1;
+  TColor **theCols = new TColor*[ncol];
+  for(int i = 0; i < ncol; ++i) {
+    theCols[i] = new TColor(999-i,0.0,0.7,0.7);
+  }
+  for(int j = 0; j < ncol; j++) {
+    theCols[j]->SetRGB(gray,gray,gray);
+    gray -= dcol;
+  }
+  int ColJul[100];
+  for(int i=0; i<100; i++) {
+    ColJul[i]=999-i;
+  }
+  t2kStyle->SetPalette(ncol,ColJul);
+
+  // Define a nicer color palette (red->blue)
+  // Uncomment these lines for a color palette (default is B&W)
+  t2kStyle->SetPalette(1,0);  // use the nice red->blue palette
+  const Int_t NRGBs = 5;
+  const Int_t NCont = 255;
+
+  Double_t stops[NRGBs] = { 0.00, 0.34, 0.61, 0.84, 1.00 };
+  Double_t red[NRGBs]   = { 0.00, 0.00, 0.87, 1.00, 0.51 };
+  Double_t green[NRGBs] = { 0.00, 0.81, 1.00, 0.20, 0.00 };
+  Double_t blue[NRGBs]  = { 0.51, 1.00, 0.12, 0.00, 0.00 };
+  TColor::CreateGradientColorTable(NRGBs, stops, red, green, blue, NCont);
+  t2kStyle->SetNumberContours(NCont);
+  return t2kStyle;
 }
 
 }
+
 #endif
