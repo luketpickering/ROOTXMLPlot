@@ -16,7 +16,7 @@ TARGETSRC := $(TARGET:.exe=.cxx)
 ROOTCFLAGS := `$(RC) --cflags`
 ROOTLDFLAGS := `$(RC) --libs --glibs`
 
-CXXFLAGS := -fPIC $(ROOTCFLAGS) -g -std=c++11
+CXXFLAGS := -fPIC $(ROOTCFLAGS) -g -std=c++11 -Wall
 LDFLAGS := $(ROOTLDFLAGS) -Wl,-rpath=.
 
 .PHONY: all clean
