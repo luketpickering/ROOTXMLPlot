@@ -85,7 +85,6 @@ T* NoSaveClone(T const * const &inp){
   return clone;
 }
 
-
 ///Scales scaled bin-by-bin to ref, errors on both are scaled by the bin
 ///value of ref as well.
 std::pair<TH1*,TH1*>
@@ -106,6 +105,17 @@ void AreaNormalise(TH1* th);
 ///Combines the functions of BinWidthNormalise and AreaNormalise and adds
 ///some debugging output
 void MakePDF(TH1* th);
+
+TH1* MakePDFClone(TH1 const * const &inp){
+  if(!inp){
+    std::cout << "[WARN]: Zeroed pointer passed to MakePDFClone" << std::endl;
+    return 0;
+  }
+  TH1* clone = static_cast<TH1*>(inp->Clone());
+  clone->SetName((std::string(clone->GetName())+"_pdfc").c_str());
+  MakePDF(clone);
+  return clone;
+}
 
 inline double GetMaximumBinContents(TH1 const * inp){
   return inp->GetBinContent(inp->GetMaximumBin());
@@ -207,7 +217,7 @@ inline std::string ConfineWidthStringWithIndent(
   int sslen = 0;
   while(true){
     ss << inp.substr(sslen,width);
-    if((sslen+width) < inp.length()){
+    if(size_t(sslen+width) < inp.length()){
       ss << "\n" << indent;
       sslen += width;
     } else {

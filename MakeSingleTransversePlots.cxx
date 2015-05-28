@@ -16,10 +16,12 @@
 #include "PlottingTypes.hxx"
 #include "PlottingUtils.hxx"
 #include "PlottingIO.hxx"
+#include "PlottingSelections.hxx"
 
 using namespace PlottingDefaults;
 using namespace PlottingUtils;
 using namespace DataSpecifics;
+using namespace PlottingSelections;
 
 namespace {
   TFile* OutputTCanviFile;
@@ -29,7 +31,8 @@ namespace {
 }
 
 TH1* DummyRatioGuide(int color=kBlack,
- float xMin=DataSpecifics::DPhiTMin, float xMax=DataSpecifics::DPhiTMax){
+ float xMin=PlottingSelections::DPhiTMin,
+ float xMax=PlottingSelections::DPhiTMax){
   TH1* dummy = new TH1F("dummy","",1,xMin, xMax);
   dummy->Fill(1);
   dummy->SetLineColor(color);
@@ -139,8 +142,8 @@ TCanvas* TargetDeptDPTCanvas(bool IsNucEmit=false){
 
   canv->cd(2);
 
-  TH1* DRG = DummyRatioGuide(DataSpecifics::DPhiTMin_deg,
-                              DataSpecifics::DPhiTMax_deg);
+  TH1* DRG = DummyRatioGuide(PlottingSelections::DPhiTMin_deg,
+                              PlottingSelections::DPhiTMax_deg);
 
   TH1* PB_C_Hist_Ratio_NEUT = ScaleToRef(NEUT_Pb_Hist,NEUT_C_Hist).first;
   SetLowerPaneHistoDefaults(PB_C_Hist_Ratio_NEUT,"Ratio (Scaled To Denominator)",
@@ -412,6 +415,7 @@ TCanvas* EmissionFractions(std::string generator, bool FractionNumerIsEmit){
   TCanvas* canv = CanvasFactory((generator+CanvString+"FractionsCanv").c_str());
 
   int linestyle = 1;
+  (void)linestyle;
 
 //Carbon************************************************************************
   TH1* C_Numer = NoSaveClone(FractionNumerIsEmit ?
@@ -563,8 +567,8 @@ TCanvas* GeneratorDeptDPTCanvas(bool IsNucEmit=false){
   SetSeriesStyle(C_GENIE_NEUT_Ratio, kBlue,1);
   C_GENIE_NEUT_Ratio->Draw("EHIST SAME");
 
-  TH1* DRG = DummyRatioGuide(DataSpecifics::DPhiTMin_deg,
-                              DataSpecifics::DPhiTMax_deg);
+  TH1* DRG = DummyRatioGuide(PlottingSelections::DPhiTMin_deg,
+                              PlottingSelections::DPhiTMax_deg);
   DRG->Draw("HIST SAME");
 
   leg = LegendFactory( (1.0 - P1LegendWidth - Pad1XMargin),
@@ -689,8 +693,8 @@ namespace ModeDependence {
 
   T_NE_NoNE_Ratio->Draw("EHIST");
 
-  TH1* DRG = DummyRatioGuide(DataSpecifics::DPhiTMin_deg,
-                              DataSpecifics::DPhiTMax_deg);
+  TH1* DRG = DummyRatioGuide(PlottingSelections::DPhiTMin_deg,
+                              PlottingSelections::DPhiTMax_deg);
   DRG->Draw("HIST SAME");
 
   leg = LegendFactory( (1.0 - P1LegendWidth - Pad1XMargin),
@@ -1485,7 +1489,7 @@ int MakeSomePlotzz() {
   TCanvas* dummyCanv = new TCanvas("dummyCanv","");
   dummyCanv->Update();dummyCanv->Print((std::string(OutputPDFFileName)+"[").c_str());
 
-  if(!PlottingIO::LoadHistograms(HistogramCacheFileName.c_str())){
+  if(!PlottingIO::InitialiseHistogramCache(HistogramCacheFileName.c_str())){
     return 1;
   }
   std::cout <<
@@ -1497,17 +1501,17 @@ int MakeSomePlotzz() {
 
   OutputTCanviFile = new TFile(OutputTCanvasFileName.c_str(),"RECREATE");
 
-  SaveAndPrint(DPHITMODEC());
-  SaveAndPrint(GaussianExampleCanvas());
-  SaveAndPrint(DPHITCCQEGENCOMP());
-  SaveAndPrint(DPHITCCQEGENCOMPNORESCAT());
-  SaveAndPrint(DPHITNUCEMIT("NEUT"));
-  SaveAndPrint(DPHITNUCEMIT("GENIE"));
-  SaveAndPrint(DPHITNUCEMIT("NuWro"));
-  SaveAndPrint(DPHITNUCEMIT("GiBUU"));
-  SaveAndPrint(DPHITNUCEMITO("NEUT"));
-  SaveAndPrint(DPHITNUCEMITO("GENIE"));
-  SaveAndPrint(TargetDependenceRatio("CCQE"));
+  // SaveAndPrint(DPHITMODEC());
+  // SaveAndPrint(GaussianExampleCanvas());
+  // SaveAndPrint(DPHITCCQEGENCOMP());
+  // SaveAndPrint(DPHITCCQEGENCOMPNORESCAT());
+  // SaveAndPrint(DPHITNUCEMIT("NEUT"));
+  // SaveAndPrint(DPHITNUCEMIT("GENIE"));
+  // SaveAndPrint(DPHITNUCEMIT("NuWro"));
+  // SaveAndPrint(DPHITNUCEMIT("GiBUU"));
+  // SaveAndPrint(DPHITNUCEMITO("NEUT"));
+  // SaveAndPrint(DPHITNUCEMITO("GENIE"));
+  // SaveAndPrint(TargetDependenceRatio("CCQE"));
 
   // SaveAndPrint(ArgueTheCaseForNE_neut());
   // SaveAndPrint(ArgueTheCaseForNE_genie());
@@ -1550,13 +1554,13 @@ int MakeSomePlotzz() {
   // SaveAndPrint(FSIModeCompare("NuWro","C","AlphaT"));
   // SaveAndPrint(FSIModeCompare("NuWro","C","Pt"));
 
-  SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNProtons"));
-  SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNGammma"));
-  SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNNeutron"));
-  SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNPiPlus"));
-  SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNPiZero"));
-  SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNPiMinus"));
-  SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNPrimaryParticles"));
+  // SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNProtons"));
+  // SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNGammma"));
+  // SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNNeutron"));
+  // SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNPiPlus"));
+  // SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNPiZero"));
+  // SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNPiMinus"));
+  // SaveAndPrint(TargetDependence::SpeciesCanvas("ccqeNPrimaryParticles"));
 
   // SaveAndPrint(GeneratorDependence::ProtonMomentumCanvas("C"));
   // SaveAndPrint(GeneratorDependence::ProtonMomentumCanvas("O"));
