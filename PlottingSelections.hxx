@@ -1,5 +1,8 @@
 #ifndef __PLOTTTINGSELECTIONS_HXX_SEEN__
 #define __PLOTTTINGSELECTIONS_HXX_SEEN__
+#include <map>
+#include <string>
+
 #include "PlottingTypes.hxx"
 #include "PlottingUtils.hxx"
 
@@ -21,7 +24,7 @@ namespace PlottingSelections {
   constexpr double DPhiTZoomxMin = ((!DoLogx)?0.0:1E-5);
   constexpr double DPhiTZoomxMax = 1E-1;
 
-  constexpr int DPhiTBins_deg = 100;
+  constexpr int DPhiTBins_deg = 500;
   constexpr double DPhiTMin_deg = ((!DoLogx)?0.0:1E-2);
   constexpr double DPhiTMax_deg = 180.0;
 
@@ -29,15 +32,16 @@ namespace PlottingSelections {
   constexpr double DPhiTZoomxMin_deg = ((!DoLogx)?0.0:1E-5);
   constexpr double DPhiTZoomxMax_deg = 6.0;
 
-  constexpr int DAlphaTBins_deg = 100;
+  constexpr int DAlphaTBins_deg = 500;
   constexpr double DAlphaTMin_deg = ((!DoLogx)?0.0:1E-2);
   constexpr double DAlphaTMax_deg = 180.0;
 
-  constexpr int DPTBins = 100;
+  constexpr int DPTBins = 500;
   constexpr double DPTMin = ((!DoLogx)?0.0:1E-2);
   constexpr double DPTMax = 700; //MeV
 
   void InitSelections();
+  void InitSelectionsXML(std::string const &confFile);
 
   PlottingTypes::Selection1D const * FindSel1D(std::string name);
   PlottingTypes::Selection2D const * FindSel2D(std::string name);

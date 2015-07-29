@@ -5,18 +5,21 @@ RC := root-config
 BDIR :=bin
 LDIR :=lib
 
-TOBJS := PlottingUtils.cxx PlottingIO.cxx PlottingSelections.cxx
+TOBJS := PlottingIO.cxx PlottingSelections.cxx PlottingUtils.cxx  style_Xianguo.cxx PlottingAutoPlots.cxx
 TOBJH := $(TOBJS:.cxx=.hxx)
 TOBJH += PlottingTypes.hxx
-TOBJSO := $(TOBJS:.cxx=.so)
+TOBJ := $(TOBJS:.cxx=.o)
 
 TARGET := MakeSingleTransversePlots.exe
 TARGETSRC := $(TARGET:.exe=.cxx)
 
 ROOTCFLAGS := `$(RC) --cflags`
-ROOTLDFLAGS := `$(RC) --libs --glibs`
+ROOTLDFLAGS := `$(RC) --libs --glibs` -lXMLIO
 
-CXXFLAGS := -fPIC $(ROOTCFLAGS) -g -std=c++11 -Wall
+UTILSLOC=../utils
+UTILSDEPSO=libPureGenUtils.so
+
+CXXFLAGS := -fPIC $(ROOTCFLAGS) -g -std=c++11 -Wall -I$(UTILSLOC)
 LDFLAGS := $(ROOTLDFLAGS) -Wl,-rpath=.
 
 .PHONY: all clean
@@ -28,19 +31,31 @@ all: $(TARGET)
 	@echo "*********************************************************************"
 	mkdir -p $(BDIR) $(LDIR)
 	mv $(TARGET) $(BDIR)/
-	mv PlottingUtils.so PlottingIO.so PlottingSelections.so $(LDIR)/
+	mv $(UTILSDEPSO) $(LDIR)/
 
-$(TARGET): $(TARGETSRC) $(TOBJSO) $(TOBJH)
-	$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $(TARGETSRC) $(TOBJSO)
+$(TARGET): $(TARGETSRC) $(TOBJ) $(TOBJH) $(UTILSDEPSO)
+	$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $(TARGETSRC) $(TOBJ) $(UTILSDEPSO)
 
-PlottingUtils.so: PlottingUtils.cxx PlottingUtils.hxx PlottingTypes.hxx
-	$(CXX) $(CXXFLAGS) -shared PlottingUtils.cxx -o $@
-PlottingIO.so: PlottingIO.cxx PlottingIO.hxx PlottingTypes.hxx PlottingUtils.hxx
-	$(CXX) $(CXXFLAGS) -shared PlottingIO.cxx -o $@
-PlottingSelections.so: PlottingSelections.cxx PlottingSelections.hxx
-	$(CXX) $(CXXFLAGS) -shared PlottingSelections.cxx -o $@
+$(UTILSDEPSO):
+	ln -s `readlink -f $(UTILSLOC)/lib/$@` $@
+
+PlottingUtils.o: PlottingUtils.cxx PlottingUtils.hxx PlottingTypes.hxx
+	$(CXX) $(CXXFLAGS) -c PlottingUtils.cxx -o $@
+
+PlottingIO.o: PlottingIO.cxx PlottingIO.hxx PlottingTypes.hxx PlottingUtils.hxx
+	$(CXX) $(CXXFLAGS) -c PlottingIO.cxx -o $@
+
+PlottingSelections.o: PlottingSelections.cxx PlottingSelections.hxx
+	$(CXX) $(CXXFLAGS) -c PlottingSelections.cxx -o $@
+
+PlottingAutoPlots.o: PlottingAutoPlots.cxx PlottingAutoPlots.hxx
+	$(CXX) $(CXXFLAGS) -c PlottingAutoPlots.cxx -o $@
+
+style_Xianguo.o: style_Xianguo.cxx style_Xianguo.hxx
+	$(CXX) $(CXXFLAGS) -c style_Xianguo.cxx -o $@
+
 clean:
-	rm -rf $(TOBJSO)\
+	rm -rf $(TOBJ)\
         $(TARGET)\
         $(BDIR) \
         $(LDIR)

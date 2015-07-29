@@ -33,40 +33,35 @@ namespace Data {
 
 namespace DataSpecifics {
 
-  constexpr int C_Color = kRed+2;
-  constexpr int C_hN_Color = kAzure-7;
-  constexpr int C_norescat_Color = kPink+9;
-  constexpr int C_2_9_Color = kBlack;
-  constexpr int O_Color = kBlue-3;
-  constexpr int Pb_Color = kOrange;
-  constexpr int Fe_Color = kMagenta+2;
-  constexpr int Fe_norescat_Color = kCyan;
-  constexpr int Fe_nofm_Color = kGreen+2;
-
-  constexpr int NEUT_Line = 1;
-  constexpr int GENIE_Line = 2;
-  constexpr int NuWro_Line = 3;
-
   constexpr char const * VarTreeName = "TransversitudenessPureSim";
-
   constexpr Long64_t DrawNoMore = 1000000;
-
 }
 
 namespace Data {
   PlottingTypes::Generator const * FindGen(std::string name);
-  PlottingTypes::Target const * FindTar(PlottingTypes::Generator const & Gen,
+  PlottingTypes::Sample const * FindTar(PlottingTypes::Generator const & Gen,
     std::string name);
 }
 
 namespace PlottingIO {
 
+  extern std::string OutputPDFFileName;
+  extern std::string OutputTCanvasFileName;
+  extern std::string HistogramCacheFileName;
+
+  void InitOutputCanvasFile();
+  void CloseOutputCanvasFile();
+  TCanvas* SaveAndPrint(TCanvas* canv, std::string const &outputname="");
+
+  void SetIOVerbosity(int verb);
+
   TH1* FillHistogram1D(std::string GenName, std::string TarName,
-    std::string SelName);
-  TH1* FillHistogram2D(std::string GenName, std::string TarName,
-    std::string SelName);
+    std::string SelName, bool Redraw=false);
+  TH2* FillHistogram2D(std::string GenName, std::string TarName,
+    std::string SelName, bool Redraw=false);
 
   bool InitialiseHistogramCache(char const* HistogramCacheFileName,
+    std::string const & XMLConfFile, std::string const & SelectionsXMLFile,
     bool PreLoadAll=false);
 }
 #endif

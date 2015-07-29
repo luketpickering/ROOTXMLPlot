@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<config>
+  <Samples>
+    <Generator Name="NEUT">
+      <Sample Name="C_0.6_RFG">
+        <Target>C</Target>
+        <Flux>0.6</Flux>
+        <FlatTreeLocation>/abc/def/flattree.root</FlatTreeLocation>
+        <Description>RFG</Description>
+      </Sample>
+      <Sample Name="C_0.6_RFG+RPA+MEC">
+        <Target>C</Target>
+        <Flux>0.6</Flux>
+        <FlatTreeLocation>/abc/def/flattree.root</FlatTreeLocation>
+        <Description>RFG+RPA+MEC</Description>
+      </Sample>
+    </Generator>
+  </Samples>
+  <Selections>
+    <PreSelections>
+      <PreSelection Name="CCQE">(MuonProtonTransversity.NeutConventionReactionCode==1)&&(MuonProtonTransversity.MuonPDG==13)&&(MuonProtonTransversity.FirstProtonPDG==2212)</PreSelection>
+    </PreSelections>
+    <PlotSelections>
+      <Selection1D Name="CCQE" NBins="100" XBinLow="0" XBinUpper="180" InvalidateCache="false" PreSelection="CCQE">
+        <DrawString>MuonProtonTransversity.DeltaPhiT_HMProton_deg</DrawString>
+        <SelString>(MuonProtonTransversity.HMProtonMomentum_MeV&gt;10)</SelString>
+      </Selection1D>
+    </PlotSelections>
+  </Selections>
+  <Plots>
+    <Canvas1D Name="mycanv" Title="Some Plot #varphi" PrintName="myplot.svg" XTitle="#delta#phi_{T}", YTitle="p.d.f">
+      <Series1D Generator="NEUT" Sample="C_0.6_RFG" Selection="CCQE" LineStyle="1" LineColor="1" LineWidth="1" LegendTitle=""/>
+      <Series1D Generator="NEUT" Sample="C_0.6_RFG+RPA+MEC" Selection="CCQE" LineStyle="1" LineColor="2" LegendTitle=""/>
+      <!-- <Series2D Generator="" Sample="" Selection="CCQE" Selection="" LineStyle="" LineColor="" Projection=""/> -->
+      <Ratio1D Generator="" Sample="" Selection="CCQE" Selection="" LineStyle="" LineColor="" />
+    </Canvas1D>
+<!--  Not Yet Implemented
+    <Canvas2D Name="" Title="" PrintName="">
+      <Series2D />
+    </Canvas2D> -->
+  </Plots>
+</config>
