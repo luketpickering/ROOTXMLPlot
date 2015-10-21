@@ -223,8 +223,8 @@ TH1D* NeutrinoTools::ToPDF(const TH1 *hraw, const TString hn)
 
 //thresh, min integral to compute
 //kmax true: each slice the max is at 1,
-TH2* NeutrinoTools::NormalHist(const TH2 *hraw, const Double_t thres, const Bool_t kmax)
-{
+TH2* NeutrinoTools::NormalHist(const TH2 *hraw, const Double_t thres, const Bool_t kmax) {
+
   TH2 *hh=(TH2*)hraw->Clone(Form("%snor",hraw->GetName()));
   hh->Scale(0);
 
@@ -413,7 +413,15 @@ Double_t * NeutrinoTools::GetAxisArray(TAxis * aa)
   return bins;
 }
 
-void NeutrinoTools::FitSlicesY(const TH2D *hh, TH1D *&hnor, TH1D *&hmpv, TH1D *&hwid, TH1D *&hres, TH1D *&hchi, const TString formula, const Double_t thres, TList *ll)
+void NeutrinoTools::FitSlicesY(const TH2D *hh,
+           TH1D *&hnor,
+           TH1D *&hmpv,
+           TH1D *&hwid,
+           TH1D *&hres,
+           TH1D *&hchi,
+           const TString formula,
+           const Double_t thres,
+           TList *ll)
 {
   const Int_t x0 = hh->GetXaxis()->GetFirst();
   const Int_t x1 = hh->GetXaxis()->GetLast();
@@ -427,7 +435,7 @@ void NeutrinoTools::FitSlicesY(const TH2D *hh, TH1D *&hnor, TH1D *&hmpv, TH1D *&
   const Double_t ymin = hh->GetYaxis()->GetXmin();
   const Double_t ymax = hh->GetYaxis()->GetXmax();
 
-  hnor = new TH1D(Form("%s_%samp",hh->GetName(), formula.Data()), "", nx, xmin, xmax); if(ll){ll->Add(hnor);}
+  hnor = new TH1D(Form("%s_%samp", hh->GetName(), formula.Data()), "", nx, xmin, xmax); if(ll){ll->Add(hnor);}
   hmpv = new TH1D(Form("%s_%smpv",hh->GetName(), formula.Data()), "", nx, xmin, xmax); if(ll){ll->Add(hmpv);}
   hwid = new TH1D(Form("%s_%swid",hh->GetName(), formula.Data()), "", nx, xmin, xmax); if(ll){ll->Add(hwid);}
   hres = new TH1D(Form("%s_%sres",hh->GetName(), formula.Data()), "", nx, xmin, xmax); if(ll){ll->Add(hres);}

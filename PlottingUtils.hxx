@@ -27,6 +27,7 @@ namespace {
 }
 
 class EInvalidPlot : public std::exception {};
+class EInvalidTFile : public std::exception {};
 class EInvalidSample : public EInvalidPlot {};
 class EInvalidGenerator : public EInvalidPlot {};
 
@@ -154,7 +155,7 @@ TLatex* TitleFactory(std::string const &TitleText="TitleBeHere",
   float TextSize=PlottingDefaults::TitleTextSize);
 
 ///Where legends are made
-TLegend* LegendFactory(float lx0,float ly0,float lx1,float ly1);
+TLegend* LegendFactory(float lx0=0.0, float ly0=0.0, float lx1=0.0, float ly1=0.0);
 
 //***********END****************Factory Utils**********************************/
 
@@ -204,6 +205,16 @@ inline void MakePDF(std::vector<TH1 *> const histos,
   }
 }
 
+template<typename T>
+inline Float_t GetLargestYVal(std::vector<std::pair<TH1*,T>> const histos){
+  Float_t max = 0;
+  for(auto const & histo : histos){
+    Float_t esto = GetMaximumBinContents(histo.first) ;
+    max = esto > max ? esto : max;
+  }
+  return max;
+}
+
 inline Float_t GetLargestYVal(std::vector<TH1 *> const histos){
   Float_t max = 0;
   for(auto const & histo : histos){
@@ -214,12 +225,24 @@ inline Float_t GetLargestYVal(std::vector<TH1 *> const histos){
 }
 
 inline void SetUserRangeToMaxYVal(std::vector<TH1*> histos,
-  Float_t minval=0xDEADDEAD){
+  Float_t minval=0xDEADDEAD, Float_t YStretchFactor=0xDEADDEAD){
   Float_t ymin = (minval==0xDEADDEAD)?PlottingDefaults::MinYVal:minval;
   Float_t max = GetLargestYVal(histos);
   for(auto & histo : histos){
     histo->GetYaxis()->SetRangeUser(ymin,
       max*PlottingDefaults::YStretchFactor);
+  }
+}
+
+template<typename T>
+inline void SetUserRangeToMaxYVal(std::vector<std::pair<TH1*,T>> histos,
+  Float_t minval=0xDEADDEAD, Float_t yStretchFactor=0xDEADDEAD){
+  Float_t ymin = (minval==0xDEADDEAD)?PlottingDefaults::MinYVal:minval;
+  Float_t max = GetLargestYVal(histos);
+  for(auto & histo : histos){
+    histo.first->GetYaxis()->SetRangeUser(ymin,
+      max*(yStretchFactor==0xDEADDEAD ? (PlottingDefaults::YStretchFactor):
+                                        yStretchFactor) );
   }
 }
 
@@ -335,17 +358,21 @@ inline TH1F* MakePeakCorrXTH1(TH2 const * inpHist){
   return corrPlot;
 }
 
-inline std::string GetIntegralAsString(TH1 const * hist){
+inline std::string GetIntegralAsString(TH1 const * hist, size_t prec=1){
   std::stringstream ss("");
-  ss << std::setprecision(2) << hist->Integral();
+  ss << std::setprecision(prec) << hist->Integral();
   return ss.str();
+}
+
+inline void AddCountToTHTitle(char const* title, TH1* hist){
+  hist->SetTitle((std::string(title) + " ("
+      + GetIntegralAsString(hist) + ")").c_str());
 }
 
 inline void AddCountToTHTitle(
   std::vector< std::pair< char const*, TH1*> >histos){
   for(auto const &namepair : histos){
-    namepair.second->SetTitle((std::string(namepair.first) + " ("
-      + GetIntegralAsString(namepair.second) + ")").c_str());
+    AddCountToTHTitle(namepair.first, namepair.second);
   }
 }
 
@@ -361,14 +388,34 @@ inline void DrawTHs(std::vector<TH1*> histos,
   }
 }
 
+inline void DrawTHs(std::vector<std::pair<TH1*,std::string>> histos){
+  int ctr = 0;
+  for(auto const &hist : histos){
+    hist.first->Draw((hist.second+(ctr!=0?" SAME":"")).c_str());
+    ctr++;
+  }
+}
+
 inline void AddToLegend(std::vector<TH1*> histos, TLegend* leg){
   for(auto const &hist : histos){
-    leg->AddEntry(hist,hist->GetTitle(),(hist->GetLineStyle()==0?"p":"l"));
+    std::string styleString = "";
+    if(hist->GetLineWidth()!=0){
+      styleString += "l";
+    }
+    if(hist->GetFillStyle()!=0){
+      styleString += "f";
+    }
+    if(hist->GetMarkerStyle()!=0){
+      styleString += "p";
+    }
+    leg->AddEntry(hist,hist->GetTitle(),styleString.c_str());
   }
 }
 
 inline TStyle* MakeT2KStyle(){
   TStyle *t2kStyle = new TStyle("T2K","T2K approved plots style");
+
+  t2kStyle->SetHatchesLineWidth(t2kStyle->GetHatchesLineWidth()*3);
 
   // use plain black on white colors
   t2kStyle->SetFrameBorderMode(0);
@@ -449,6 +496,9 @@ inline TStyle* MakeT2KStyle(){
   return t2kStyle;
 }
 
+std::string CombineWeightStrings(const std::string& a,
+  const std::string& b);
+
 }
 
 namespace IOUtils {
@@ -463,7 +513,6 @@ namespace IOUtils {
     std::string const &ChildNodeName);
 
   EColor ParseRootColor(std::string const &colorString);
-
 }
 
 
@@ -481,6 +530,12 @@ std::ostream& operator<<(std::ostream& os,
 
 std::ostream& operator<<(std::ostream& os,
   PlottingTypes::SeriesDescriptor sd);
+
+std::ostream& operator<<(std::ostream& os,
+  PlottingTypes::LineDescriptor ld);
+
+std::ostream& operator<<(std::ostream& os,
+  PlottingTypes::LegendDescriptor ld);
 
 std::ostream& operator<<(std::ostream& os,
   PlottingTypes::PlotDescriptor pd);

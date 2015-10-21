@@ -31,10 +31,12 @@ namespace Data {
           > Histos;
 }
 
-namespace DataSpecifics {
+namespace ExternalData {
+  extern std::map<std::string, TFile*> Files;
+}
 
-  constexpr char const * VarTreeName = "TransversitudenessPureSim";
-  constexpr Long64_t DrawNoMore = 1000000;
+namespace DataSpecifics {
+  extern std::string VarTreeName;
 }
 
 namespace Data {
@@ -49,12 +51,16 @@ namespace PlottingIO {
   extern std::string OutputTCanvasFileName;
   extern std::string HistogramCacheFileName;
 
+  void SetTreeName(std::string newName);
+  void SetMaxEntriesToDraw(long long nentries);
+
   void InitOutputCanvasFile();
   void CloseOutputCanvasFile();
   TCanvas* SaveAndPrint(TCanvas* canv, std::string const &outputname="");
 
   void SetIOVerbosity(int verb);
 
+  TH1* GetExternalTH1(std::string GenName, std::string TarName);
   TH1* FillHistogram1D(std::string GenName, std::string TarName,
     std::string SelName, bool Redraw=false);
   TH2* FillHistogram2D(std::string GenName, std::string TarName,

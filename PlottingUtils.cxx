@@ -357,6 +357,21 @@ TCanvas* GetInsetCanvas(
   return canv;
 }
 
+std::string CombineWeightStrings(const std::string& a,
+  const std::string& b){
+
+  if(!a.length()){
+    if(!b.length()){
+      return "";
+    }
+    return b;
+  }
+  if(!b.length()){
+    return a;
+  }
+  return ("((" + a + ")&&(" + b + "))");
+}
+
 }
 
 namespace IOUtils {
@@ -446,12 +461,19 @@ namespace IOUtils {
     int offset = 0;
 
     if(colorString[0] == 'k'){
-      size_t eoc = colorString.find_first_of(" +");
+      size_t eoc = colorString.find_first_of(" +-");
+      bool isp = (colorString.find_first_of("+") != std::string::npos);
+      bool ism = (colorString.find_first_of("-") != std::string::npos);
+      if((isp && ism)){
+        std::cout << "[ERROR]: Found kColor + and kColor -, going with +"
+          << std::endl;
+          ism = false;
+      }
 
       std::string cSubStr = colorString.substr(0,eoc);
 
-      size_t sois = colorString.substr(eoc+1).find_first_not_of(" +");
-      intString = colorString.substr(eoc+1+sois);
+      size_t sois = colorString.substr(eoc+1).find_first_not_of(" +-");
+      intString = std::string(ism?"-":"")+colorString.substr(eoc+1+sois);
 
       if((eoc == std::string::npos) || (sois == std::string::npos)){
         intString = "0";
@@ -578,6 +600,21 @@ std::ostream& operator<<(std::ostream& os,
     case PlottingTypes::SeriesDescriptor::kTH2:{
       return os << "2D Histogram";
     }
+    case PlottingTypes::SeriesDescriptor::kTH1QuadRatio1:{
+      return os << "QuadRatio-1";
+    }
+    case PlottingTypes::SeriesDescriptor::kTH1QuadRatio2:{
+      return os << "QuadRatio-2";
+    }
+    case PlottingTypes::SeriesDescriptor::kTH1QuadRatio3:{
+      return os << "QuadRatio-3";
+    }
+    case PlottingTypes::SeriesDescriptor::kTH1QuadRatio4:{
+      return os << "QuadRatio-4";
+    }
+    case PlottingTypes::SeriesDescriptor::kTH1External:{
+      return os << "External TH1";
+    }
     default:{
       return os << "N/A";
     }
@@ -588,7 +625,37 @@ std::ostream& operator<<(std::ostream& os, PlottingTypes::SeriesDescriptor sd){
   os << "{ Gen: " << sd.Generator << ", Sample: " << sd.Sample
     << ", Sel: " << sd.Selection << ", Type : " << sd.Type
     << ", LineStyle : {C : " << sd.LineColor
-    << " , W : " <<  sd.LineWidth << " , S : " << sd.LineStyle << " } }";
+    << " , W : " <<  sd.LineWidth << " , S : " << sd.LineStyle << " }, "
+    << ", MarkerStyle : {C : " << sd.MarkerColor
+    << " , W : " <<  sd.MarkerSize << " , S : " << sd.MarkerStyle << " }, "
+    << ", FillStyle : {C : " << sd.FillColor
+    << " , S : " << sd.FillStyle << " }, "
+      "DrawOptions: " << sd.DrawOpt << " }";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os,
+  PlottingTypes::LineDescriptor ld){
+  os << "{ Coords: {" << ld.X1 << "," << ld.X2 << "," << ld.Y1 << ", "
+    << ld.Y2 << "}";
+  if(ld.X3Arrow != 0xdeadbeef){
+    os << ", X3Arrow: " << ld.X3Arrow;
+  }
+  os << " }";
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os,
+  PlottingTypes::LegendDescriptor ld){
+
+  os << "{ Coords: {" << ld.X1 << "," << ld.X2 << "," << ld.Y1 << ", "
+    << ld.Y2 << "}, NColumns: " << ld.NColumns;
+
+  if(ld.Title.length()){
+    os << ", Title: " << ld.Title;
+  }
+
+  os << " }";
   return os;
 }
 
@@ -596,11 +663,21 @@ std::ostream& operator<<(std::ostream& os,
   PlottingTypes::PlotDescriptor pd){
 
   os << "{ Name : " << pd.Name << ", Title : " << pd.Title << ", Print: "
-    << pd.PrintName << " Series : { \n\t";
+    << pd.PrintName << ", Series : { \n\t";
   for(size_t i = 0; i < pd.Series.size(); ++i){
     os << pd.Series[i] << ((i == (pd.Series.size()-1))?"}":",\n\t");
   }
   os << ", Logs: X:" << (pd.Logs&1) << ", Y:" <<  (pd.Logs&2) << ", Z: "
-    << (pd.Logs&4) << "}";
+    << (pd.Logs&4);
+  if(pd.Legend.X1 != 0xdeadbeef){
+    os << ", Legend: " << pd.Legend << std::endl;
+  }
+  if(pd.Lines.size()){
+    os << ", Lines: { \n\t";
+    for(size_t i = 0; i < pd.Lines.size(); ++i){
+      os << pd.Lines[i] << ((i == (pd.Lines.size()-1))?"}":",\n\t");
+    }
+  }
+  os << "}";
   return os;
 }

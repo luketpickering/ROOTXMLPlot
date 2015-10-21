@@ -15,6 +15,11 @@ using namespace PlottingTypes;
 using namespace PlottingSelections;
 using namespace DataSpecifics;
 
+namespace DataSpecifics {
+  std::string VarTreeName = "TransversitudenessPureSim";
+  long long MaxEntriesToDraw = 1000000000; // ROOT6 defines TTree::kMaxEntries;
+}
+
 namespace {
   TFile* ogf = 0;
   int FileOpsVerb = 0;
@@ -128,6 +133,12 @@ namespace Data {
   }
 }
 
+namespace ExternalData {
+  std::map<std::string, TFile*> Files;
+  std::vector<PlottingTypes::ExternalFile> ExternalDescriptors;
+}
+
+
 namespace PlottingIO {
 
   TFile* OutputTCanviFile = 0;
@@ -136,6 +147,13 @@ namespace PlottingIO {
   std::string OutputTCanvasFileName = "";
   std::string HistogramCacheFileName = "";
 
+  void SetTreeName(std::string newName){
+    DataSpecifics::VarTreeName = newName;
+  }
+
+  void SetMaxEntriesToDraw(long long nentries){
+    DataSpecifics::MaxEntriesToDraw = nentries;
+  }
   void InitOutputCanvasFile(){
     if(!OutputTCanviFile && OutputTCanvasFileName.length()){
       OutputTCanviFile = new TFile(OutputTCanvasFileName.c_str(),"RECREATE");
@@ -179,6 +197,75 @@ namespace PlottingIO {
       canv->Print(outputname.c_str());
     }
     return canv;
+  }
+
+  bool AddExternalDataXML(std::string configXML){
+
+    TXMLEngine* _xmlengine = new TXMLEngine;
+    TXMLEngine& xmlengine = *_xmlengine;
+    xmlengine.SetSkipComments();
+
+    XMLNodePointer_t confSecNode =
+      IOUtils::GetNamedChildElementOfDocumentRoot(xmlengine,
+        configXML, "ExternalFiles");
+    if(!confSecNode){
+      delete _xmlengine; return false;
+    }
+
+    for(XMLAttrPointer_t fileNode = xmlengine.GetChild(confSecNode);
+        (fileNode != NULL);
+        fileNode = xmlengine.GetNext(fileNode)){
+      if(std::string(xmlengine.GetNodeName(fileNode)) != "TFile"){
+        std::cout << "[WARN]" << "Found an unexpected node named \""
+          << xmlengine.GetNodeName(fileNode) << "\" in the ExternalFiles "
+          "element. Skipping" << std::endl;
+        continue;
+      }
+
+      std::string const &externalName =
+        IOUtils::GetAttrValue(xmlengine, fileNode,"Name");
+      std::string const &externalLocation =
+        IOUtils::GetAttrValue(xmlengine, fileNode, "Location");
+
+      if(!externalLocation.length() || ! externalName.length()){
+        std::cout << "[WARN] Found dud External File descriptor { "
+        << externalName
+        << ", " << externalLocation << " }." << std::endl;
+        continue;
+      }
+      std::cout << "[INFO] Found External File Descriptor: { " << externalName
+        << ", " << externalLocation << " }." << std::endl;
+
+      ExternalData::ExternalDescriptors.emplace_back(externalName, externalLocation);
+    }
+    delete _xmlengine;
+    return bool(ExternalData::ExternalDescriptors.size());
+  }
+
+  void LoadExternalDataTFiles(){
+    for(auto const & ef : ExternalData::ExternalDescriptors){
+      TFile* extFile = TFile::Open(ef.Location.c_str());
+      if(!extFile || !extFile->IsOpen()){
+        std::cerr << "[ERROR] Couldn't open TFile: " << ef.Location << std::endl;
+        throw EInvalidTFile();
+      }
+      ExternalData::Files[ef.Name] = extFile;
+    }
+  }
+
+  TH1* GetExternalTH1(std::string Name, std::string TH1Name){
+    if(!ExternalData::Files.count(Name)){
+      std::cerr << "[ERROR] Don't know about External TFile: " << Name
+        << std::endl;
+      throw EInvalidTFile();
+    }
+    TH1* rtn = dynamic_cast<TH1*>(ExternalData::Files[Name]->Get(TH1Name.c_str()));
+    if(!rtn){
+      std::cerr << "[ERROR] External TFile: " << Name
+        << " didn't contain TH1 " << TH1Name << std::endl;
+      throw EInvalidPlot();
+    }
+    return rtn;
   }
 
   PlottingTypes::Sample AddSampleDescriptionXML(
@@ -280,7 +367,7 @@ namespace PlottingIO {
         if( !(Data::Trees[Gen.Name][Sm.Name] =
               dynamic_cast<TTree*>(
                 Data::Files[Gen.Name][Sm.Name]\
-                ->Get(VarTreeName)) ) ){
+                ->Get(VarTreeName.c_str())) ) ){
           std::cerr << "[ERROR]: Failed to load TTree(" << VarTreeName
             << "): for Generator: " << Gen.Name
             << ", Sample: " << Sm.Name << std::endl;
@@ -298,8 +385,6 @@ namespace PlottingIO {
     return ss.str();
   }
 
-  std::set<std::string> DrawnTH1s;
-
   ///Creates a new histogram and fills with the specified selection from the
   ///tree specified by Generator and Sample. 1D Selections
   TH1* FillHistogram(Generator const & Gen, Sample const & Sm,
@@ -307,6 +392,7 @@ namespace PlottingIO {
     std::string HistName = MakeHistoName(Gen, Sm, Sel);
 
     //Short circuit to stop invalidate cache requiring multiple redraws
+    static std::set<std::string> DrawnTH1s;
     if(DrawnTH1s.count(HistName)){
       std::cout << "[INFO]: Short circuit returning " << HistName << std::endl;
       return Data::Histos[Gen.Name][Sm.Name][Sel.Name];
@@ -350,7 +436,7 @@ namespace PlottingIO {
     ///Fill it
     Data::Trees[Gen.Name][Sm.Name]->Draw(
       (PlotDrawString + " >> " + HistName).c_str(),
-      Sel.Cut,"",DrawNoMore);
+      Sel.Cut,"",DataSpecifics::MaxEntriesToDraw);
 
     std::cout << "\t\t\"" << Data::Histos[Gen.Name][Sm.Name][Sel.Name]->GetName()
       << "\" Contained: [Uf:"
@@ -371,6 +457,14 @@ namespace PlottingIO {
   TH2* FillHistogram(Generator const & Gen, Sample const & Sm,
     Selection2D const & Sel){
     std::string HistName = MakeHistoName(Gen, Sm, Sel);
+
+    //Short circuit to stop invalidate cache requiring multiple redraws
+    static std::set<std::string> DrawnTH2s;
+    if(DrawnTH2s.count(HistName)){
+      std::cout << "[INFO]: Short circuit returning " << HistName << std::endl;
+      return static_cast<TH2*>(Data::Histos[Gen.Name][Sm.Name][Sel.Name]);
+    }
+
     std::cout << "\t\"HistName: \"" << HistName << std::endl;
     std::cout << "\t" << Sel << std::endl;
 
@@ -393,13 +487,15 @@ namespace PlottingIO {
 
     ///Fill it
     Data::Trees[Gen.Name][Sm.Name]->Draw(
-      (Sel.DrawString + " >> " + HistName).c_str(), Sel.Cut,"",DrawNoMore);
+      (Sel.DrawString + " >> " + HistName).c_str(), Sel.Cut,"",
+      DataSpecifics::MaxEntriesToDraw);
     std::cout << "\t\t\""
       << Data::Histos[Gen.Name][Sm.Name][Sel.Name]->GetName()
       << "\" Contained: "
       << Data::Histos[Gen.Name][Sm.Name][Sel.Name]->Integral()
       << std::endl << std::endl;
     Data::HistoCacheFile->Write(0,TObject::kWriteDelete);
+    DrawnTH2s.insert(HistName);
     RevertGFile(); // Return to previous gfile
     return static_cast<TH2*>(Data::Histos[Gen.Name][Sm.Name][Sel.Name]);
   }
@@ -595,11 +691,12 @@ namespace PlottingIO {
     DefineGeneratorsXML(XMLConfFile);
 
     (void)Verbosity;
-    // Data::DefineGenerators();
+    if(AddExternalDataXML(XMLConfFile)){
+      LoadExternalDataTFiles();
+    }
+
     PlottingSelections::InitSelectionsXML(SelectionsXMLFile);
     Data::HaveTrees = LoadFilesAndTrees();
-
-    // return false;
 
     if(!Data::HaveTrees){ return false; }
 

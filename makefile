@@ -45,10 +45,10 @@ PlottingUtils.o: PlottingUtils.cxx PlottingUtils.hxx PlottingTypes.hxx
 PlottingIO.o: PlottingIO.cxx PlottingIO.hxx PlottingTypes.hxx PlottingUtils.hxx
 	$(CXX) $(CXXFLAGS) -c PlottingIO.cxx -o $@
 
-PlottingSelections.o: PlottingSelections.cxx PlottingSelections.hxx
+PlottingSelections.o: PlottingSelections.cxx PlottingSelections.hxx PlottingUtils.hxx
 	$(CXX) $(CXXFLAGS) -c PlottingSelections.cxx -o $@
 
-PlottingAutoPlots.o: PlottingAutoPlots.cxx PlottingAutoPlots.hxx
+PlottingAutoPlots.o: PlottingAutoPlots.cxx PlottingAutoPlots.hxx PlottingUtils.hxx
 	$(CXX) $(CXXFLAGS) -c PlottingAutoPlots.cxx -o $@
 
 style_Xianguo.o: style_Xianguo.cxx style_Xianguo.hxx
