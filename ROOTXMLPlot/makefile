@@ -10,14 +10,15 @@ TOBJH := $(TOBJS:.cxx=.hxx)
 TOBJH += PlottingTypes.hxx
 TOBJ := $(TOBJS:.cxx=.o)
 
-TARGET := MakeSingleTransversePlots.exe
+TARGET := ROOTXMLPlot.exe
 TARGETSRC := $(TARGET:.exe=.cxx)
 
 ROOTCFLAGS := `$(RC) --cflags`
 ROOTLDFLAGS := `$(RC) --libs --glibs` -lXMLIO
 
 UTILSLOC=../utils
-UTILSDEPSO=libPureGenUtils.so
+LIBUTILS=libPureGenUtils.so
+UTILSDEPSO:=$(UTILSLOC)/lib/$(LIBUTILS)
 
 CXXFLAGS := -fPIC $(ROOTCFLAGS) -g -std=c++11 -Wall -I$(UTILSLOC)
 LDFLAGS := $(ROOTLDFLAGS) -Wl,-rpath=.
@@ -33,11 +34,12 @@ all: $(TARGET)
 	mv $(TARGET) $(BDIR)/
 	mv $(UTILSDEPSO) $(LDIR)/
 
-$(TARGET): $(TARGETSRC) $(TOBJ) $(TOBJH) $(UTILSDEPSO)
-	$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $(TARGETSRC) $(TOBJ) $(UTILSDEPSO)
+$(TARGET): $(TARGETSRC) $(TOBJ) $(TOBJH) $(LIBUTILS)
+	$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $(TARGETSRC) $(TOBJ) $(LIBUTILS)
 
-$(UTILSDEPSO):
-	ln -s `readlink -f $(UTILSLOC)/lib/$@` $@
+$(LIBUTILS):
+	cd $(UTILSLOC); $(MAKE)
+	ln -s `readlink -f $(UTILSDEPSO)` $@
 
 PlottingUtils.o: PlottingUtils.cxx PlottingUtils.hxx PlottingTypes.hxx
 	$(CXX) $(CXXFLAGS) -c PlottingUtils.cxx -o $@
@@ -59,3 +61,4 @@ clean:
         $(TARGET)\
         $(BDIR) \
         $(LDIR)
+	cd $(UTILSLOC); $(MAKE) clean
