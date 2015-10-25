@@ -40,8 +40,8 @@ namespace DataSpecifics {
 }
 
 namespace Data {
-  PlottingTypes::Generator const * FindGen(std::string name);
-  PlottingTypes::Sample const * FindTar(PlottingTypes::Generator const & Gen,
+  PlottingTypes::SampleGroup const * FindGen(std::string name);
+  PlottingTypes::Sample const * FindTar(PlottingTypes::SampleGroup const & Grp,
     std::string name);
 }
 
@@ -66,8 +66,7 @@ namespace PlottingIO {
   TH2* FillHistogram2D(std::string GenName, std::string TarName,
     std::string SelName, bool Redraw=false);
 
-  bool InitialiseHistogramCache(char const* HistogramCacheFileName,
-    std::string const & XMLConfFile, std::string const & SelectionsXMLFile,
-    bool PreLoadAll=false);
+  bool InitialiseHistogramCache(char const* HistogramCacheFileName);
+  bool InitialisedInputData(std::string const & XMLConfFile);
 }
 #endif

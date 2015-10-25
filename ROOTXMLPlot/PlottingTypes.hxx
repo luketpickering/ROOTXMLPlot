@@ -21,144 +21,56 @@ namespace PlottingTypes {
 
   struct Sample {
     std::string Name;
-    std::string Flux;
     std::string FileLocation;
-    std::string Description;
     bool InvalidateCache;
 
     Sample(std::string const name="", std::string const filelocation="",
-      bool invalidatecache=true,
-      std::string const flux="", std::string const description=""){
-      Name = name;
-      FileLocation = filelocation;
-      Flux = flux;
-      Description = description;
-      InvalidateCache = invalidatecache;
-    }
+      bool invalidatecache=true): Name(name), FileLocation (filelocation),
+      InvalidateCache(invalidatecache){}
 
     bool IsValid() const {
       return ((Name.length() > 0) && (FileLocation.length() > 0));
     }
-
-    bool operator==(Sample const &other) const {
-      return ((Name==other.Name)&&(FileLocation==other.FileLocation));
-    }
-
   };
 
-  struct Generator {
+  inline bool operator==(Sample const &one, Sample const &other){
+    return ((one.Name==other.Name)&&(one.FileLocation==other.FileLocation));
+  }
+
+  struct SampleGroup {
     std::string Name;
     std::vector<Sample> Samples;
 
-    Generator(char const* name=""){
+    SampleGroup(char const* name=""){
       Name = name;
-    }
-
-    bool operator==(Generator const &other) const {
-      return (Name==other.Name);
     }
   };
 
+  inline bool operator==(SampleGroup const &one, SampleGroup const &other){
+    return (one.Name==other.Name);
+  }
+
   struct Selection {
     std::string Name;
-    std::string DrawString;
+    std::string DrawCommand;
     TCut Cut;
     bool InvalidateCache;
 
+  protected:
     Selection(){
       Name = "";
-      DrawString = "";
+      DrawCommand = "";
       Cut = "";
       InvalidateCache = true;
     }
     Selection(std::string const &name,
-              std::string const &drawString,
+              std::string const &drawCommand,
               TCut const &cut,
               bool const &invalidatecache=true){
       Name = name;
-      DrawString = drawString;
+      DrawCommand = drawCommand;
       Cut = cut;
       InvalidateCache = invalidatecache;
-    }
-  };
-
-  struct Selection1D : public Selection {
-
-    int NBins;
-    double XBinLow;
-    double XBinUpper;
-    bool DoPerUseXOffset;
-    double PerUseXOffset;
-
-    Selection1D() : Selection() {
-      NBins = 0;
-      XBinLow = 0;
-      XBinUpper = 0;
-      DoPerUseXOffset = false;
-      PerUseXOffset = 0;
-    }
-
-    Selection1D(std::string name,
-                std::string drawString,
-                TCut const &cut,
-                int nBins,
-                double xBinLow,
-                double xBinUpper,
-                bool invalidatecache=true,
-                bool doPerUseXOffset=false,
-                double perUseXOffset=0.005) :
-      Selection(name, drawString, cut, invalidatecache) {
-
-      NBins = nBins;
-      XBinLow = xBinLow;
-      XBinUpper = xBinUpper;
-      DoPerUseXOffset = doPerUseXOffset;
-      PerUseXOffset = perUseXOffset;
-    }
-  };
-
-  struct Selection2D : public Selection {
-
-    int NXBins;
-    double XBinLow;
-    double XBinUpper;
-
-    int NYBins;
-    double YBinLow;
-    double YBinUpper;
-
-    bool Normalise;
-
-    Selection2D() : Selection() {
-      NXBins = 0;
-      XBinLow = 0;
-      XBinUpper = 0;
-
-      NYBins = 0;
-      YBinLow = 0;
-      YBinUpper = 0;
-
-    }
-
-    Selection2D(std::string name,
-                std::string drawString,
-                TCut const &cut,
-                int nxBins,
-                double xBinLow,
-                double xBinUpper,
-                int nyBins,
-                double yBinLow,
-                double yBinUpper,
-                bool invalidatecache=true) :
-      Selection(name, drawString, cut, invalidatecache) {
-
-      NXBins = nxBins;
-      XBinLow = xBinLow;
-      XBinUpper = xBinUpper;
-
-      NYBins = nyBins;
-      YBinLow = yBinLow;
-      YBinUpper = yBinUpper;
     }
   };
 
@@ -179,7 +91,7 @@ namespace PlottingTypes {
       kTH1External
     };
 
-    std::string Generator;
+    std::string SampleGroup;
     std::string Sample;
     std::string Selection;
     std::string LegendTitle;
@@ -198,7 +110,7 @@ namespace PlottingTypes {
 
 
     SeriesDescriptor(
-      std::string Generator,
+      std::string SampleGroup,
       std::string Sample,
       std::string Selection,
       std::string LegendTitle,
@@ -214,7 +126,7 @@ namespace PlottingTypes {
       Float_t Scale,
       std::string DrawOpt="HIST"){
 
-      this->Generator = Generator;
+      this->SampleGroup = SampleGroup;
       this->Sample = Sample;
       this->Selection = Selection;
       this->LineColor = LineColor;
@@ -339,6 +251,7 @@ namespace PlottingTypes {
     std::vector<LineDescriptor> Lines;
     LegendDescriptor Legend;
   };
+
 }
 
 #endif

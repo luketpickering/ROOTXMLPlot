@@ -2,70 +2,72 @@
 <config>
   <Samples>
 
-    <Generator Name="MyGen">
+    <SampleGroup Name="MyGen">
       <Sample Name="MySample1">
-        <Target>C</Target>
-        <Flux>0.6 GeV</Flux>
         <FlatTreeLocation>/abc/def/flattree.root</FlatTreeLocation>
-        <Description>Some Sample 1</Description>
       </Sample>
-    </Generator>
+    </SampleGroup>
 
-    <Generator Name="MySecondGen">
+    <SampleGroup Name="MySecondGen">
 
       <Sample Name="MySample1">
-        <Target>C</Target>
-        <Flux>0.6 GeV</Flux>
         <FlatTreeLocation>/abc/def/flattree2.root</FlatTreeLocation>
-        <Description>Some Sample 1</Description>
       </Sample>
 
       <Sample Name="MySample2">
-        <Target>C</Target>
-        <Flux>0.6 GeV</Flux>
         <FlatTreeLocation>/abc/def/flattree3.root</FlatTreeLocation>
-        <Description>Some Sample 2</Description>
       </Sample>
 
-    </Generator>
+    </SampleGroup>
 
   </Samples>
 
-  <Selections>
+  <SelectionDescriptors>
 
     <PreSelections>
       <PreSelection Name="PreSelName">(MyProperty&gt;50)</PreSelection>
+      <PreSelection Name="PreSelName2">(MyProperty&gt;70)&amp;&amp;(MyOtherProperty&lt;20)</PreSelection>
     </PreSelections>
 
-    <PlotSelections>
 
-      <Selection1D Name="Selection" NBins="100" XBinLow="0" XBinUpper="180" InvalidateCache="false" PreSelection="PreSelName">
-        <DrawString>MyInterestingVariables</DrawString>
-        <SelString>(MyCutVariable&lt;100)</SelString>
-      </Selection1D>
+    <Selection1D Name="Selection" NXBins="100" XBinLow="0" XBinUpper="180" InvalidateCache="false" PreSelections="PreSelName">
+      <DrawCommand>MyInterestingVariables</DrawCommand>
+      <ExtraSelection>(MyCutVariable&lt;100)</ExtraSelection>
+    </Selection1D>
 
-      <Selection2D Name="Selection2D" NXBins="100" XBinLow="0" XBinUpper="180" NYBins="100" YBinLow="0" YBinUpper="10" InvalidateCache="true" PreSelection="PreSelName">
-        <DrawString>MyInterestingVariable:MyOtherInterestingVariable</DrawString>
-        <SelString>(MyCutVariable&lt;100)</SelString>
-      </Selection2D>
+    <Selection2D Name="Selection2D" NXBins="100" XBinLow="0" XBinUpper="180" NYBins="100" YBinLow="0" YBinUpper="10" InvalidateCache="true" PreSelections="PreSelName PreSelname2">
+      <DrawCommand>MyInterestingVariable:MyOtherInterestingVariable</DrawCommand>
+      <ExtraSelection>(MyCutVariable&lt;100)</ExtraSelection>
+    </Selection2D>
 
-    </PlotSelections>
-  </Selections>
+  </SelectionDescriptors>
 
   <Plots>
 
-    <Canvas1D Name="mycanv" Title="Some Plot #varphi" PrintName="myplot.svg" XTitle="#varphi (A.U.)", YTitle="p.d.f">
+    <Canvas Name="mycanv" Title="Some Plot #varphi" PrintName="myplot.svg" XTitle="#varphi (A.U.)", YTitle="p.d.f" LMargin="0.1" RMargin="0.3" BMargin="0.1" TMargin="0.3" >
       <Line X1="0.1" X2="0.1" Y1="0.1" Y2="0.3" X3Arrow="0.11" LineStyle="1" LineColor="kGreen+1" LineWidth="2" />
       <Legend NColumns="2" X1="0.1" X2="0.3" Y1="0.1" Y2="0.3" Title="MyLegend" />
-      <Series1D Generator="MyGen" Sample="MySample1" Selection="Selection" LineStyle="1" LineColor="kRed+1" LineWidth="1" LegendTitle="SomeTitle"/>
-      <Ratio1D Generator="MySecondGen" Sample="MySample1" Selection="Selection" LineStyle="2" LineColor="kBlack" LineWidth="2"  LegendTitle="RatioTitle" />
-      <Ratio1D Generator="MySecondGen" Sample="MySample2" Selection="Selection"/>
-      <Profile2D Generator="MySecondGen" Sample="MySample1" Selection="Selection2D" LineStyle="2" LineColor="kBlack" LineWidth="2"  LegendTitle="MyProfile" />
-    </Canvas1D>
 
-    <Canvas1D Name="mycanv2D" Title="Some Plot #varphi : #theta" PrintName="myplot2D.svg" XTitle="#varphi (A.U.)", YTitle="#theta (XYZ)">
-      <Series2D Generator="MySecondGen" Sample="MySample1" Selection="Selection2D" />
-    </Canvas1D>
+      <Series1D SampleGroup="MyGen" Sample="MySample1" Selection="Selection" LineStyle="1" LineColor="kRed+1" LineWidth="1" LegendTitle="SomeTitle"/>
+
+      <Ratio1D>
+        <Style LineStyle="2" LineColor="kBlack" LineWidth="2" LegendTitle="RatioTitle"/>
+        <Numer SampleGroup="MySecondGen" Sample="MySample1" Selection="Selection"/>
+        <Denom SampleGroup="MySecondGen" Sample="MySample2" Selection="Selection"/>
+      </Ratio1D>
+
+      <Profile2D SampleGroup="MySecondGen" Sample="MySample1" Selection="Selection2D" LineStyle="2" LineColor="kBlack" LineWidth="2"  LegendTitle="MyProfile" />
+
+    </Canvas>
+
+    <Canvas Name="mycanv2D" Title="Some Plot #varphi : #theta" PrintName="myplot2D.svg" XTitle="#varphi (A.U.)", YTitle="#theta (XYZ)" LMargin="0.1" RMargin="0.3" BMargin="0.1" TMargin="0.3" PadSplit="Y">
+      <Pad>
+        <Series2D SampleGroup="MySecondGen" Sample="MySample1" Selection="Selection2D" />
+      </Pad>
+      <Pad>
+        <Series2D SampleGroup="MySecondGen" Sample="MySample2" Selection="Selection2D" />
+      </Pad>
+    </Canvas>
 
   </Plots>
 </config>

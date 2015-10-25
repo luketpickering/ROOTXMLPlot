@@ -3,7 +3,6 @@
 
 #include "TH2F.h"
 #include "TROOT.h"
-#include "TXMLEngine.h"
 
 #include "PureGenUtils.hxx"
 
@@ -73,7 +72,7 @@ namespace {
     return NotMk;
   }
 
-  std::string MakeHistoName(Generator const& gen, Sample const& tar,
+  std::string MakeHistoName(SampleGroup const& gen, Sample const& tar,
     Selection const& sel){
     return (gen.Name + "_" + tar.Name + "_" + sel.Name);
   }
@@ -103,33 +102,35 @@ namespace Data {
                     >
           > Histos;
 
-  std::vector<PlottingTypes::Generator> Generators;
+  std::vector<PlottingTypes::SampleGroup> SampleGroups;
 
-  PlottingTypes::Generator const * FindGen(std::string name){
-    if(std::find_if(Generators.begin(), Generators.end(),
-        [&](Generator const & el){return (el.Name == name);}) !=
-          Generators.end()){
-      return &(*std::find_if(Generators.begin(), Generators.end(),
-        [&](Generator const & el){return (el.Name == name);}));
+  PlottingTypes::SampleGroup const * FindGen(std::string name){
+    if(std::find_if(SampleGroups.begin(), SampleGroups.end(),
+        [&](SampleGroup const & el){return (el.Name == name);}) !=
+          SampleGroups.end()){
+      return &(*std::find_if(SampleGroups.begin(), SampleGroups.end(),
+        [&](SampleGroup const & el){return (el.Name == name);}));
     }
-    std::cout << "[WARN]: Couldn't find Generator named: " << name
+    std::cout << "[WARN]: Couldn't find SampleGroup named: " << name
       << std::endl;
-    throw EInvalidGenerator();
-    return 0;
+    throw EInvalidSampleGroup();
+    return nullptr;
   }
 
-  PlottingTypes::Sample const * FindSample(PlottingTypes::Generator const & Gen,
+  PlottingTypes::Sample const * FindSample(
+    PlottingTypes::SampleGroup const & Grp,
     std::string name){
-    if(std::find_if(Gen.Samples.begin(),Gen.Samples.end(),
+
+    if(std::find_if(Grp.Samples.begin(),Grp.Samples.end(),
         [&](Sample const & el){return (el.Name == name);}) !=
-        Gen.Samples.end()){
-      return &(*std::find_if(Gen.Samples.begin(),Gen.Samples.end(),
+        Grp.Samples.end()){
+      return &(*std::find_if(Grp.Samples.begin(),Grp.Samples.end(),
           [&](Sample const & el){return (el.Name == name);}));
     }
     std::cout << "[WARN]: Couldn't find Sample named: " << name
-      << " for generator " << Gen.Name << std::endl;
+      << " for generator " << Grp.Name << std::endl;
     throw EInvalidSample();
-    return 0;
+    return nullptr;
   }
 }
 
@@ -138,10 +139,9 @@ namespace ExternalData {
   std::vector<PlottingTypes::ExternalFile> ExternalDescriptors;
 }
 
-
 namespace PlottingIO {
 
-  TFile* OutputTCanviFile = 0;
+  TFile* OutputTCanviFile = nullptr;
   int PDFsWritten = 0;
   std::string OutputPDFFileName = "";
   std::string OutputTCanvasFileName = "";
@@ -154,6 +154,7 @@ namespace PlottingIO {
   void SetMaxEntriesToDraw(long long nentries){
     DataSpecifics::MaxEntriesToDraw = nentries;
   }
+
   void InitOutputCanvasFile(){
     if(!OutputTCanviFile && OutputTCanvasFileName.length()){
       OutputTCanviFile = new TFile(OutputTCanvasFileName.c_str(),"RECREATE");
@@ -168,7 +169,7 @@ namespace PlottingIO {
     OutputTCanviFile->Write();
     OutputTCanviFile->Close();
     delete OutputTCanviFile;
-    OutputTCanviFile = 0;
+    OutputTCanviFile = nullptr;
   }
 
   TCanvas* SaveAndPrint(TCanvas* canv, std::string const &outputname){
@@ -201,19 +202,16 @@ namespace PlottingIO {
 
   bool AddExternalDataXML(std::string configXML){
 
-    TXMLEngine* _xmlengine = new TXMLEngine;
-    TXMLEngine& xmlengine = *_xmlengine;
-    xmlengine.SetSkipComments();
+    TXMLEngine& xmlengine = XMLDoc::Get("Samples");
 
     XMLNodePointer_t confSecNode =
-      IOUtils::GetNamedChildElementOfDocumentRoot(xmlengine,
-        configXML, "ExternalFiles");
+      IOUtils::GetNamedChildElementOfDocumentRoot(xmlengine, "ExternalFiles");
     if(!confSecNode){
-      delete _xmlengine; return false;
+      return false;
     }
 
     for(XMLAttrPointer_t fileNode = xmlengine.GetChild(confSecNode);
-        (fileNode != NULL);
+        (fileNode != nullptr);
         fileNode = xmlengine.GetNext(fileNode)){
       if(std::string(xmlengine.GetNodeName(fileNode)) != "TFile"){
         std::cout << "[WARN]" << "Found an unexpected node named \""
@@ -236,9 +234,9 @@ namespace PlottingIO {
       std::cout << "[INFO] Found External File Descriptor: { " << externalName
         << ", " << externalLocation << " }." << std::endl;
 
-      ExternalData::ExternalDescriptors.emplace_back(externalName, externalLocation);
+      ExternalData::ExternalDescriptors.emplace_back(externalName,
+        externalLocation);
     }
-    delete _xmlengine;
     return bool(ExternalData::ExternalDescriptors.size());
   }
 
@@ -268,8 +266,9 @@ namespace PlottingIO {
     return rtn;
   }
 
-  PlottingTypes::Sample AddSampleDescriptionXML(
-    TXMLEngine &xmlengine, XMLDocPointer_t sampleNode){
+  PlottingTypes::Sample AddSampleDescriptionXML(XMLDocPointer_t sampleNode){
+
+    TXMLEngine& xmlengine = XMLDoc::Get("Samples");
 
     std::string const &sampleName =
       IOUtils::GetAttrValue(xmlengine, sampleNode,"Name");
@@ -286,92 +285,79 @@ namespace PlottingIO {
     return PlottingTypes::Sample(sampleName,sampleLocation, Invalidate);
   }
 
-  void AddGeneratorDescriptionXML(TXMLEngine &xmlengine,
-    XMLDocPointer_t genDescriptNode){
+  void AddSampleGroupDescriptionXML(XMLDocPointer_t smplGrpDescriptNode){
 
-    std::string genName;
+    TXMLEngine& xmlengine = XMLDoc::Get("Samples");
 
-    for(XMLAttrPointer_t nodeAttr_ptr = xmlengine.GetFirstAttr(genDescriptNode);
-        (nodeAttr_ptr != NULL);
-        nodeAttr_ptr = xmlengine.GetNextAttr(nodeAttr_ptr)){
-      if(std::string(xmlengine.GetAttrName(nodeAttr_ptr)) != "Name"){
-        std::cout << "[WARN]: Unexpected attribute on "
-          << xmlengine.GetNodeName(genDescriptNode) << " node: "
-          << xmlengine.GetAttrName(nodeAttr_ptr) << std::endl;
-        continue;
-      }
-      genName = xmlengine.GetAttrValue(nodeAttr_ptr);
-      break;
-    }
+    std::string SampleGroupName = XMLUtils::GetAttrValue(xmlengine,
+      smplGrpDescriptNode, "Name");
 
-    if(genName.length() == 0){
-      std::cout << "[WARN]: Found un-Named generator node." << std::endl;
+    if(SampleGroupName.length() == 0){
+      std::cout << "[WARN]: Found un-Named SampleGroup node." << std::endl;
       return;
     }
 
-    Data::Generators.emplace_back(genName.c_str());
-    auto &Samples = Data::Generators.back().Samples;
+    Data::SampleGroups.emplace_back(SampleGroupName.c_str());
+    auto &Samples = Data::SampleGroups.back().Samples;
 
     for(XMLNodePointer_t sampleNode =
-        xmlengine.GetChild(genDescriptNode);
-      (sampleNode != NULL);
+        xmlengine.GetChild(smplGrpDescriptNode);
+      (sampleNode != nullptr);
       sampleNode = xmlengine.GetNext(sampleNode)){
       PlottingTypes::Sample const &sample =
-        AddSampleDescriptionXML(xmlengine,sampleNode);
+        AddSampleDescriptionXML(sampleNode);
 
       if(!sample.IsValid()){
         std::cout << "[WARN]: Found invalid sample: " << sample << std::endl;
         continue;
       }
-
       std::cout << "[INFO]: Adding Sample: " << sample << std::endl;
-
       Samples.emplace_back(sample);
     }
   }
 
-  bool DefineGeneratorsXML(std::string configXML){
-    TXMLEngine* xmlengine = new TXMLEngine;
-    xmlengine->SetSkipComments();
+  bool DefineSampleGroupsXML(){
+
+    TXMLEngine& xmlengine = XMLDoc::Get("Samples");
 
     XMLNodePointer_t confSecNode =
-      IOUtils::GetNamedChildElementOfDocumentRoot(*xmlengine,
-        configXML, "Samples");
+      IOUtils::GetNamedChildElementOfDocumentRoot(xmlengine, "Samples");
     if(!confSecNode){
-      delete xmlengine; return false;
+      return false;
     }
 
-    for(XMLNodePointer_t genDescriptNode = xmlengine->GetChild(confSecNode);
-      (genDescriptNode != NULL);
-      genDescriptNode = xmlengine->GetNext(genDescriptNode)){
-      AddGeneratorDescriptionXML(*xmlengine,genDescriptNode);
+    for(XMLNodePointer_t smplGrpDescriptNode = xmlengine.GetChild(confSecNode);
+      (smplGrpDescriptNode != nullptr);
+      smplGrpDescriptNode = xmlengine.GetNext(smplGrpDescriptNode)){
+      if(std::string(xmlengine.GetNodeName(smplGrpDescriptNode)) ==
+          "SampleGroup"){
+        AddSampleGroupDescriptionXML(xmlengine,smplGrpDescriptNode);
+      }
     }
-
-    delete xmlengine;
     return true;
   }
 
   ///Loops through defined generator and Sample files and loads the TTrees into
   ///memory
   bool LoadFilesAndTrees(){
-    for(auto const &Gen : Data::Generators){
-      for(auto const &Sm : Gen.Samples){
+    for(auto const &Grp : Data::SampleGroups){
+      for(auto const &Sm : Grp.Samples){
 
-        if(!(Data::Files[Gen.Name][Sm.Name] =
+        if(!(Data::Files[Grp.Name][Sm.Name] =
             new TFile(Sm.FileLocation.c_str()))){
           std::cerr << "[ERROR]: Failed to load file: " << Sm.FileLocation
-            << " for Generator: " << Gen.Name << ", Sample: " << Sm.Name
+            << " for SampleGroup: " << Grp.Name << ", Sample: " << Sm.Name
             << std::endl;
             return false;
         }
-        if( !(Data::Trees[Gen.Name][Sm.Name] =
+        if( !(Data::Trees[Grp.Name][Sm.Name] =
               dynamic_cast<TTree*>(
-                Data::Files[Gen.Name][Sm.Name]\
+                Data::Files[Grp.Name][Sm.Name]\
                 ->Get(VarTreeName.c_str())) ) ){
           std::cerr << "[ERROR]: Failed to load TTree(" << VarTreeName
-            << "): for Generator: " << Gen.Name
+            << "): for SampleGroup: " << Grp.Name
             << ", Sample: " << Sm.Name << std::endl;
-            return false;
+          return false;
         }
       }
     }
@@ -386,16 +372,16 @@ namespace PlottingIO {
   }
 
   ///Creates a new histogram and fills with the specified selection from the
-  ///tree specified by Generator and Sample. 1D Selections
-  TH1* FillHistogram(Generator const & Gen, Sample const & Sm,
+  ///tree specified by SampleGroup and Sample. 1D Selections
+  TH1* FillHistogram(SampleGroup const & Grp, Sample const & Sm,
     Selection1D const & Sel){
-    std::string HistName = MakeHistoName(Gen, Sm, Sel);
+    std::string HistName = MakeHistoName(Grp, Sm, Sel);
 
     //Short circuit to stop invalidate cache requiring multiple redraws
     static std::set<std::string> DrawnTH1s;
     if(DrawnTH1s.count(HistName)){
       std::cout << "[INFO]: Short circuit returning " << HistName << std::endl;
-      return Data::Histos[Gen.Name][Sm.Name][Sel.Name];
+      return Data::Histos[Grp.Name][Sm.Name][Sel.Name];
     }
 
     std::cout << "\t\"HistName: \"" << HistName << std::endl;
@@ -405,64 +391,64 @@ namespace PlottingIO {
 
     SaveGFile();
     //Stick stuff in sensible places
-    MkMv(Data::HistoCacheFile,(Gen.Name + "/" + Sm.Name));
+    MkMv(Data::HistoCacheFile,(Grp.Name + "/" + Sm.Name));
 
     ///Make the TH1F
     Double_t offset = 0;
     if(Sel.DoPerUseXOffset){ //If we want each Sample to be slightly
       //offset from each other
       size_t TarNum = std::distance(
-        Gen.Samples.begin(),
-        std::find(Gen.Samples.begin(), Gen.Samples.end(),Sm));
-      if(TarNum == Gen.Samples.size()){
+        Grp.Samples.begin(),
+        std::find(Grp.Samples.begin(), Grp.Samples.end(),Sm));
+      if(TarNum == Grp.Samples.size()){
         std::cout << "[ERROR] Couldn't find this Sample descriptor: "
-          << Gen.Name << std::endl;
+          << Grp.Name << std::endl;
       }
       offset = ((Sel.XBinUpper - Sel.XBinLow)/Sel.NBins)*Sel.PerUseXOffset*TarNum;
       PlotDrawString = AddOffSetToDrawString(Sel.DrawString, offset);
     }
 
     try{
-      Data::Histos[Gen.Name][Sm.Name][Sel.Name] =
+      Data::Histos[Grp.Name][Sm.Name][Sel.Name] =
         new TH1F(HistName.c_str(),"",
           Sel.NBins,Sel.XBinLow+offset,Sel.XBinUpper+offset);
     } catch(std::bad_alloc& ba){
       std::cerr << "Caught bad alloc, exiting grace-ish-fully."
         << std::endl;
         RevertGFile(); //Return to previous gfile
-        return 0;
+        return nullptr;
     }
 
     ///Fill it
-    Data::Trees[Gen.Name][Sm.Name]->Draw(
+    Data::Trees[Grp.Name][Sm.Name]->Draw(
       (PlotDrawString + " >> " + HistName).c_str(),
       Sel.Cut,"",DataSpecifics::MaxEntriesToDraw);
 
-    std::cout << "\t\t\"" << Data::Histos[Gen.Name][Sm.Name][Sel.Name]->GetName()
+    std::cout << "\t\t\"" << Data::Histos[Grp.Name][Sm.Name][Sel.Name]->GetName()
       << "\" Contained: [Uf:"
-      << Data::Histos[Gen.Name][Sm.Name][Sel.Name]->GetBinContent(0) << "]"
-      << Data::Histos[Gen.Name][Sm.Name][Sel.Name]->Integral()
-      << "[Of:" << Data::Histos[Gen.Name][Sm.Name][Sel.Name]->GetBinContent(
+      << Data::Histos[Grp.Name][Sm.Name][Sel.Name]->GetBinContent(0) << "]"
+      << Data::Histos[Grp.Name][Sm.Name][Sel.Name]->Integral()
+      << "[Of:" << Data::Histos[Grp.Name][Sm.Name][Sel.Name]->GetBinContent(
           Sel.NBins+1)
       << "]"
       << std::endl << std::endl;
     Data::HistoCacheFile->Write(0,TObject::kWriteDelete);
     DrawnTH1s.insert(HistName);
     RevertGFile();
-    return Data::Histos[Gen.Name][Sm.Name][Sel.Name];
+    return Data::Histos[Grp.Name][Sm.Name][Sel.Name];
   }
 
   ///Creates a new histogram and fills with the specified selection from the
-  ///tree specified by Generator and Sample. 2D Selections
-  TH2* FillHistogram(Generator const & Gen, Sample const & Sm,
+  ///tree specified by SampleGroup and Sample. 2D Selections
+  TH2* FillHistogram(SampleGroup const & Grp, Sample const & Sm,
     Selection2D const & Sel){
-    std::string HistName = MakeHistoName(Gen, Sm, Sel);
+    std::string HistName = MakeHistoName(Grp, Sm, Sel);
 
     //Short circuit to stop invalidate cache requiring multiple redraws
     static std::set<std::string> DrawnTH2s;
     if(DrawnTH2s.count(HistName)){
       std::cout << "[INFO]: Short circuit returning " << HistName << std::endl;
-      return static_cast<TH2*>(Data::Histos[Gen.Name][Sm.Name][Sel.Name]);
+      return static_cast<TH2*>(Data::Histos[Grp.Name][Sm.Name][Sel.Name]);
     }
 
     std::cout << "\t\"HistName: \"" << HistName << std::endl;
@@ -470,11 +456,11 @@ namespace PlottingIO {
 
     SaveGFile();
     //Stick stuff in sensible places
-    MkMv(Data::HistoCacheFile,(Gen.Name + "/" + Sm.Name));
+    MkMv(Data::HistoCacheFile,(Grp.Name + "/" + Sm.Name));
 
     ///Make the TH1F
     try {
-      Data::Histos[Gen.Name][Sm.Name][Sel.Name] =
+      Data::Histos[Grp.Name][Sm.Name][Sel.Name] =
         new TH2F(HistName.c_str(),"",
           Sel.NXBins,Sel.XBinLow,Sel.XBinUpper,
           Sel.NYBins,Sel.YBinLow,Sel.YBinUpper);
@@ -482,26 +468,26 @@ namespace PlottingIO {
       std::cerr << "Caught bad alloc, exiting grace-ish-fully."
         << std::endl;
         RevertGFile(); // Return to previous gfile
-        return 0;
+        return nullptr;
     }
 
     ///Fill it
-    Data::Trees[Gen.Name][Sm.Name]->Draw(
+    Data::Trees[Grp.Name][Sm.Name]->Draw(
       (Sel.DrawString + " >> " + HistName).c_str(), Sel.Cut,"",
       DataSpecifics::MaxEntriesToDraw);
     std::cout << "\t\t\""
-      << Data::Histos[Gen.Name][Sm.Name][Sel.Name]->GetName()
+      << Data::Histos[Grp.Name][Sm.Name][Sel.Name]->GetName()
       << "\" Contained: "
-      << Data::Histos[Gen.Name][Sm.Name][Sel.Name]->Integral()
+      << Data::Histos[Grp.Name][Sm.Name][Sel.Name]->Integral()
       << std::endl << std::endl;
     Data::HistoCacheFile->Write(0,TObject::kWriteDelete);
     DrawnTH2s.insert(HistName);
     RevertGFile(); // Return to previous gfile
-    return static_cast<TH2*>(Data::Histos[Gen.Name][Sm.Name][Sel.Name]);
+    return static_cast<TH2*>(Data::Histos[Grp.Name][Sm.Name][Sel.Name]);
   }
 
   //Wrapper for 1D FillHistogram
-  TH1* FillHistogram(std::tuple<PlottingTypes::Generator const &,
+  TH1* FillHistogram(std::tuple<PlottingTypes::SampleGroup const &,
     PlottingTypes::Sample const &, PlottingTypes::Selection1D const &>
       HistoDescriptor){
     return FillHistogram(std::get<0>(HistoDescriptor),
@@ -510,7 +496,7 @@ namespace PlottingIO {
   }
 
   //Wrapper for 2D FillHistogram
-  TH2* FillHistogram(std::tuple<PlottingTypes::Generator const &,
+  TH2* FillHistogram(std::tuple<PlottingTypes::SampleGroup const &,
     PlottingTypes::Sample const &, PlottingTypes::Selection2D const &>
       HistoDescriptor){
     return FillHistogram(std::get<0>(HistoDescriptor),
@@ -522,152 +508,66 @@ namespace PlottingIO {
   ///names rather than instances/pointers
   ///If a histogram exists in the Cache file it will be loaded from there
   ///rather than redrawn.
-  TH1* FillHistogram1D(std::string GenName, std::string SmName,
+  TH1* FillHistogram1D(std::string SampleGroupName, std::string SmName,
     std::string SelName, bool Redraw){
-    PlottingTypes::Generator const * Gen = Data::FindGen(GenName);
-    if(!Gen){ return 0; }
-    PlottingTypes::Sample const * Sm = Data::FindSample(*Gen,SmName);
+    PlottingTypes::SampleGroup const * Grp = Data::FindGen(SampleGroupName);
+    if(!Grp){ return nullptr; }
+    PlottingTypes::Sample const * Sm = Data::FindSample(*Grp,SmName);
     PlottingTypes::Selection1D const * Sel1D = FindSel1D(SelName);
-    if(!Sm || !Sel1D){ return 0; }
+    if(!Sm || !Sel1D){ return nullptr; }
     Redraw = Redraw || Sm->InvalidateCache || Sel1D->InvalidateCache;
     SaveGFile();
-    if(!Redraw && MkMv(Data::HistoCacheFile,(Gen->Name + "/" + Sm->Name))){
+    if(!Redraw && MkMv(Data::HistoCacheFile,(Grp->Name + "/" + Sm->Name))){
       TDirectory *dir =
         Data::HistoCacheFile->GetDirectory(
-          (Gen->Name + "/" + Sm->Name).c_str());
-      if((Data::Histos[Gen->Name][Sm->Name][Sel1D->Name] =
+          (Grp->Name + "/" + Sm->Name).c_str());
+      if((Data::Histos[Grp->Name][Sm->Name][Sel1D->Name] =
               dynamic_cast<TH1*>(dir->Get(
-                MakeHistoName(*Gen,*Sm,*Sel1D).c_str())))){
+                MakeHistoName(*Grp,*Sm,*Sel1D).c_str())))){
         RevertGFile(); // Return to previous gfile
-        return Data::Histos[Gen->Name][Sm->Name][Sel1D->Name];
+        return Data::Histos[Grp->Name][Sm->Name][Sel1D->Name];
       } else {
         if(FileOpsVerb > 1){
-          std::cout << "Couldn't find histo(" << MakeHistoName(*Gen,*Sm,*Sel1D)
+          std::cout << "Couldn't find histo(" << MakeHistoName(*Grp,*Sm,*Sel1D)
             << ") in directory..." << std::endl;
           dir->ls();
         }
       }
     }
     RevertGFile(); // Return to previous gfile
-    return FillHistogram(std::make_tuple(*Gen,*Sm,*Sel1D));
+    return FillHistogram(std::make_tuple(*Grp,*Sm,*Sel1D));
   }
 
   ///Wrapper for 1D FillHistogram which takes generator, Sample and selection
   ///names rather than instances/pointers.
   ///If a histogram exists in the Cache file it will be loaded from there
   ///rather than redrawn.
-  TH2* FillHistogram2D(std::string GenName, std::string SmName,
+  TH2* FillHistogram2D(std::string SampleGroupName, std::string SmName,
     std::string SelName, bool Redraw){
-    PlottingTypes::Generator const * Gen = Data::FindGen(GenName);
-    if(!Gen){ return 0; }
-    PlottingTypes::Sample const * Sm = Data::FindSample(*Gen,SmName);
+    PlottingTypes::SampleGroup const * Grp = Data::FindGen(SampleGroupName);
+    if(!Grp){ return nullptr; }
+    PlottingTypes::Sample const * Sm = Data::FindSample(*Grp,SmName);
     PlottingTypes::Selection2D const * Sel2D = FindSel2D(SelName);
-    if(!Sm || !Sel2D){ return 0; }
+    if(!Sm || !Sel2D){ return nullptr; }
     Redraw = Redraw || Sm->InvalidateCache || Sel2D->InvalidateCache;
     SaveGFile();
-    if(!Redraw &&  MkMv(Data::HistoCacheFile,(Gen->Name + "/" + Sm->Name))){
+    if(!Redraw &&  MkMv(Data::HistoCacheFile,(Grp->Name + "/" + Sm->Name))){
       TDirectory *dir =
         Data::HistoCacheFile->GetDirectory(
-          (Gen->Name + "/" + Sm->Name).c_str());
-      if((Data::Histos[Gen->Name][Sm->Name][Sel2D->Name] =
+          (Grp->Name + "/" + Sm->Name).c_str());
+      if((Data::Histos[Grp->Name][Sm->Name][Sel2D->Name] =
               dynamic_cast<TH2*>(dir->Get(
-                MakeHistoName(*Gen,*Sm,*Sel2D).c_str())))){
+                MakeHistoName(*Grp,*Sm,*Sel2D).c_str())))){
         RevertGFile(); // Return to previous gfile
-        return static_cast<TH2*>(Data::Histos[Gen->Name][Sm->Name][Sel2D->Name]);
+        return static_cast<TH2*>(Data::Histos[Grp->Name][Sm->Name][Sel2D->Name]);
       }
     }
     RevertGFile(); // Return to previous gfile
-    return FillHistogram(std::make_tuple(*Gen,*Sm,*Sel2D));
+    return FillHistogram(std::make_tuple(*Grp,*Sm,*Sel2D));
   }
 
-  ///Systematically loads all defined histograms. This may take a while
-  ///If a histogram exists in the Cache file it will be loaded from there
-  ///rather than redrawn.
-  bool LoadHistogramsFromFile(char const * HistogramCacheFileName){
-    Data::HistoCacheFile = new TFile(HistogramCacheFileName, "UPDATE");
-    Data::HistoCacheFile->cd();
-    if(!Data::HistoCacheFile->IsOpen()){
-      std::cout << "Couldnt open the histogram cache file: "
-        << HistogramCacheFileName << std::endl;
-      return false;
-    }
-    for(auto const &Gen : Data::Generators){
-      std::cout << "Filling Generator: " << Gen.Name << std::endl;
-      for(auto const &Sm : Gen.Samples){
-        std::cout << "\tFilling Sample: " << Sm.Name << std::endl;
-        for(auto const &selpair1D : Selections1D){
-          Selection1D const &Sel1D = selpair1D.second;
-
-          SaveGFile();
-          TDirectory *dir;
-          if((dir = Data::HistoCacheFile->GetDirectory(
-            (Gen.Name + "/" + Sm.Name).c_str()))){
-
-            if((Data::Histos[Gen.Name][Sm.Name][Sel1D.Name] =
-                dynamic_cast<TH1*>(dir->Get(
-                  MakeHistoName(Gen,Sm,Sel1D).c_str())))){
-              RevertGFile();
-              continue; //If we have found it, bail.
-            }
-          }
-
-          std::cout << "[NOTE]: Couldn't find Histo: "
-            << MakeHistoName(Gen,Sm,Sel1D)
-            << " in file: " << HistogramCacheFileName << std::endl;
-          if(Data::HaveTrees){
-            if(!FillHistogram(Gen,Sm,Sel1D)){
-              Data::HistoCacheFile->Write(0,TObject::kWriteDelete);
-              Data::HistoCacheFile->Close();
-              RevertGFile();
-              return false; //Probably caught a std::bad_alloc, it's time to leave
-            }
-            Data::Histos[Gen.Name][Sm.Name][Sel1D.Name]->Write();
-          } else {
-            std::cout << "[WARN]: We don't seem to have the data files, "
-              "cannot load this histogram." << std::endl;
-          }
-          RevertGFile();
-        }
-
-        for(auto const &selpair2D : Selections2D){
-          Selection2D const &Sel2D = selpair2D.second;
-          SaveGFile();
-          TDirectory *dir;
-          if((dir = Data::HistoCacheFile->GetDirectory(
-            (Gen.Name + "/" + Sm.Name).c_str()))){
-            if((Data::Histos[Gen.Name][Sm.Name][Sel2D.Name] =
-              dynamic_cast<TH2*>(dir->Get(
-                MakeHistoName(Gen,Sm,Sel2D).c_str())))){
-              RevertGFile();
-              continue;
-            }
-          }
-          std::cerr << "Couldn't find Histo: "
-            << MakeHistoName(Gen,Sm,Sel2D)
-            << " in file: " << HistogramCacheFileName << std::endl;
-          if(Data::HaveTrees){
-            if(!FillHistogram(Gen,Sm,Sel2D)){
-              Data::HistoCacheFile->Write(0,TObject::kWriteDelete);
-              Data::HistoCacheFile->Close();
-              RevertGFile();
-              return false;
-            }
-            Data::Histos[Gen.Name][Sm.Name][Sel2D.Name]->Write();
-          } else {
-            std::cout << "We don't seem to have the data files, cannot load"
-            " this histogram." << std::endl;
-          }
-          RevertGFile();
-        }
-      }
-    }
-    Data::HistoCacheFile->Write(0,TObject::kWriteDelete);
-    return true;
-  }
-
-  ///If a histogram exists in the Cache file it will be loaded from there
-  ///rather than redrawn.
-  bool LoadSpecificHistograms(char const * HistogramCacheFileName){
+  ///Function which loads the files and draws any pre-requested histograms.
+  bool InitialiseHistogramCache(char const* HistogramCacheFileName){
 
     Data::HistoCacheFile = new TFile(HistogramCacheFileName, "UPDATE");
     Data::HistoCacheFile->cd();
@@ -683,27 +583,23 @@ namespace PlottingIO {
     return true;
   }
 
-  ///Function which loads the files and draws any pre-requested histograms.
-  bool InitialiseHistogramCache(char const* HistogramCacheFileName,
-    std::string const & XMLConfFile, std::string const & SelectionsXMLFile,
-    bool PreLoadAll){
-
-    DefineGeneratorsXML(XMLConfFile);
+  bool InitialisedInputData(std::string const & XMLConfFile){
 
     (void)Verbosity;
-    if(AddExternalDataXML(XMLConfFile)){
-      LoadExternalDataTFiles();
+    XMLDoc::LoadDoc("Samples", XMLConfFile);
+
+    try {
+      DefineSampleGroupsXML();
+      if(AddExternalDataXML()){
+        LoadExternalDataTFiles();
+      }
+    } catch (...){
+      XMLDoc::Destroy("Samples");
+      return false;
     }
 
-    PlottingSelections::InitSelectionsXML(SelectionsXMLFile);
-    Data::HaveTrees = LoadFilesAndTrees();
+    XMLDoc::Destroy("Samples");
 
-    if(!Data::HaveTrees){ return false; }
-
-    if(PreLoadAll){
-      return LoadHistogramsFromFile(HistogramCacheFileName);
-    }
-
-    return LoadSpecificHistograms(HistogramCacheFileName);
+    return LoadFilesAndTrees();
   }
 }

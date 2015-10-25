@@ -3,17 +3,6 @@
 #include <iostream>
 #include <algorithm>
 
-#include "TH1F.h"
-#include "TH2F.h"
-#include "TFile.h"
-#include "TCanvas.h"
-#include "TTree.h"
-#include "TLegend.h"
-#include "TLatex.h"
-#include "TVectorD.h"
-#include "TProfile.h"
-#include "TRandom.h"
-
 #include "CLITools.hxx"
 
 #include "PlottingIO.hxx"
@@ -132,9 +121,13 @@ int main(int argc, char const * argv[]){
     return 0;
   }
 
+  if( !PlottingSelections::InitSelectionsXML(SelectionsXML) ){
+    return 1;
+  }
+
   TH1F::SetDefaultSumw2();
-  if(!PlottingIO::InitialiseHistogramCache(HistogramCacheFileName.c_str(),
-    SamplesXML, SelectionsXML, PreCache)){
+  if( !InitialiseHistogramCache(char const* HistogramCacheFileName) ||
+      !InitialisedInputData(std::string const & XMLConfFile) ){
     return 1;
   }
 

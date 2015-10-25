@@ -29,7 +29,7 @@ namespace {
 class EInvalidPlot : public std::exception {};
 class EInvalidTFile : public std::exception {};
 class EInvalidSample : public EInvalidPlot {};
-class EInvalidGenerator : public EInvalidPlot {};
+class EInvalidSampleGroup : public EInvalidPlot {};
 
 namespace PlottingDefaults {
   constexpr double TopPaneXLabelOffset = 50;
@@ -502,16 +502,6 @@ std::string CombineWeightStrings(const std::string& a,
 }
 
 namespace IOUtils {
-  XMLDocPointer_t GetNamedChildElementOfDocumentRoot(TXMLEngine &xmlengine,
-    std::string const &FileName, std::string const & ElementName);
-  std::string GetAttrValue(TXMLEngine &xmlengine, XMLDocPointer_t node,
-    std::string const &attrName, bool expectExclusive=false);
-
-  std::string GetNodeContent(TXMLEngine &xmlengine, XMLDocPointer_t node);
-
-  std::string GetChildNodeContent(TXMLEngine &xmlengine, XMLDocPointer_t node,
-    std::string const &ChildNodeName);
-
   EColor ParseRootColor(std::string const &colorString);
 }
 

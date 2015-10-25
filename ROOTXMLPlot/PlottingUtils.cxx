@@ -375,86 +375,13 @@ std::string CombineWeightStrings(const std::string& a,
 }
 
 namespace IOUtils {
-  XMLDocPointer_t GetNamedChildElementOfDocumentRoot(TXMLEngine &xmlengine,
-      std::string const &FileName, std::string const & ElementName){
-
-    XMLDocPointer_t xmldoc = xmlengine.ParseFile(FileName.c_str());
-
-    if(!xmldoc){
-      std::cout << "In File: " << FileName << std::endl;
-      std::cout << "[ERROR]: TXMLEngine could not parse file." << std::endl;
-      return XMLDocPointer_t();
-    }
-
-    XMLNodePointer_t rootNode = xmlengine.DocGetRootElement(xmldoc);
-
-    for(XMLNodePointer_t confSecNode = xmlengine.GetChild(rootNode);
-      (confSecNode != NULL);
-      confSecNode = xmlengine.GetNext(confSecNode)){
-      if(std::string(xmlengine.GetNodeName(confSecNode)) != ElementName){
-        continue;
-      }
-      return confSecNode;
-    }
-    std::cout << "[WARN]: In File: " << FileName << " could not find a root "
-      "element child named: " << ElementName << "." << std::endl;
-    return XMLDocPointer_t();
-  }
-
-  std::string GetAttrValue(TXMLEngine &xmlengine, XMLDocPointer_t node,
-    std::string const &attrName, bool expectExclusive){
-
-    for(XMLAttrPointer_t nodeAttr_ptr = xmlengine.GetFirstAttr(node);
-        (nodeAttr_ptr != NULL);
-        nodeAttr_ptr = xmlengine.GetNextAttr(nodeAttr_ptr)){
-      if(std::string(xmlengine.GetAttrName(nodeAttr_ptr)) != attrName){
-        if(expectExclusive){
-          std::cout << "[WARN]: Unexpected attribute on "
-            << xmlengine.GetNodeName(node) << " node: "
-            << xmlengine.GetAttrName(nodeAttr_ptr) << std::endl;
-        }
-        continue;
-      }
-      return xmlengine.GetAttrValue(nodeAttr_ptr);
-    }
-    return std::string();
-  }
-
-  std::string GetNodeContent(TXMLEngine &xmlengine, XMLDocPointer_t node){
-    std::string elementString;
-    try {
-      if(!xmlengine.GetNodeContent(node)){
-        throw std::logic_error("Empty Element.");
-      }
-      elementString = xmlengine.GetNodeContent(node);
-    } catch(std::logic_error& le){
-      std::cout << "[WARN]: Found empty element: "
-        << xmlengine.GetNodeName(node) << "." << std::endl;
-      return "";
-    }
-    return elementString;
-  }
-
-  std::string GetChildNodeContent(TXMLEngine &xmlengine, XMLDocPointer_t node,
-    std::string const &ChildNodeName){
-
-    for(XMLNodePointer_t childNode_ptr = xmlengine.GetChild(node);
-      (childNode_ptr != NULL);
-      childNode_ptr = xmlengine.GetNext(childNode_ptr)){
-
-      if(std::string(xmlengine.GetNodeName(childNode_ptr)) ==
-          ChildNodeName){
-        return GetNodeContent(xmlengine, childNode_ptr);
-      }
-    }
-    return std::string();
-  }
 
   EColor ParseRootColor(std::string const &colorString){
     if(!colorString.length()){ return kBlack; }
     // enum EColor { kWhite =0,   kBlack =1,   kGray=920,
-    //         kRed   =632, kGreen =416, kBlue=600, kYellow=400, kMagenta=616, kCyan=432,
-    //         kOrange=800, kSpring=820, kTeal=840, kAzure =860, kViolet =880, kPink=900 };
+    //         kRed   =632, kGreen =416, kBlue=600, kYellow=400, kMagenta=616,
+    //         kCyan=432, kOrange=800, kSpring=820, kTeal=840, kAzure =860,
+    //         kViolet =880, kPink=900 };
 
     std::string intString = colorString;
     EColor BaseColor = kWhite;
@@ -534,16 +461,8 @@ std::ostream & operator<<(std::ostream& os, PlottingTypes::Sample const & sm){
     os << "Name: " << sm.Name;
     added++;
   }
-  if(sm.Flux.length()){
-    os << (added?", ":"") << "Flux: " << sm.Flux;
-    added++;
-  }
   if(sm.FileLocation.length()){
     os << (added?", ":"") << "FileLocation: " << sm.FileLocation;
-    added++;
-  }
-  if(sm.Description.length()){
-    os << (added?", ":"") << "Description: " << sm.Description;
     added++;
   }
   if(sm.InvalidateCache){
@@ -622,14 +541,18 @@ std::ostream& operator<<(std::ostream& os,
 }
 
 std::ostream& operator<<(std::ostream& os, PlottingTypes::SeriesDescriptor sd){
-  os << "{ Gen: " << sd.Generator << ", Sample: " << sd.Sample
-    << ", Sel: " << sd.Selection << ", Type : " << sd.Type
+  os << "{ Grp: " << sd.SampleGroup
+    << ", Sample: " << sd.Sample
+    << ", Sel: " << sd.Selection
+    << ", Type : " << sd.Type
     << ", LineStyle : {C : " << sd.LineColor
-    << " , W : " <<  sd.LineWidth << " , S : " << sd.LineStyle << " }, "
+                << " , W : " <<  sd.LineWidth
+                << " , S : " << sd.LineStyle << " }, "
     << ", MarkerStyle : {C : " << sd.MarkerColor
-    << " , W : " <<  sd.MarkerSize << " , S : " << sd.MarkerStyle << " }, "
+                  << " , W : " <<  sd.MarkerSize
+                  << " , S : " << sd.MarkerStyle << " }, "
     << ", FillStyle : {C : " << sd.FillColor
-    << " , S : " << sd.FillStyle << " }, "
+                << " , S : " << sd.FillStyle << " }, "
       "DrawOptions: " << sd.DrawOpt << " }";
   return os;
 }
