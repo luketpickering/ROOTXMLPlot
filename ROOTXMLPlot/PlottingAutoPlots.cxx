@@ -304,6 +304,27 @@ void AddCanvasDescriptionXML(TXMLEngine &xmlengine,
     YStretch = 0XDEADDEAD;
   }
 
+  std::string const &canvXWidth =
+    IOUtils::GetAttrValue(xmlengine, canvDescriptNode, "XWidth");
+  Int_t XWidth = 0;
+  try{
+    XWidth = std::stoi(canvXWidth);
+  } catch (const std::invalid_argument& ia) {
+    std::cout << "[Warn]: Couldn't parse XWidth: \"" << canvXWidth << "\"\n\t"
+      << ia.what() << std::endl;
+  }
+
+  std::string const &canvYWidth =
+    IOUtils::GetAttrValue(xmlengine, canvDescriptNode, "YWidth");
+  Int_t YWidth = 0;
+  try{
+    YWidth = std::stoi(canvYWidth);
+  } catch (const std::invalid_argument& ia) {
+    std::cout << "[Warn]: Couldn't parse YWidth: \"" << canvYWidth << "\"\n\t"
+      << ia.what() << std::endl;
+  }
+
+
   bool doPDF = PGUtils::str2bool(IOUtils::GetAttrValue(xmlengine,
     canvDescriptNode, "DoPDF"));
   bool AddNorm = PGUtils::str2bool(IOUtils::GetAttrValue(xmlengine,
@@ -313,7 +334,7 @@ void AddCanvasDescriptionXML(TXMLEngine &xmlengine,
   std::tie(X1,X2,Y1,Y2) = GetX1X2Y1Y2Attributes(xmlengine,canvDescriptNode);
 
   PlotDescriptor pd(canvName, canvTitle,canvXAxisTitle, canvYAxisTitle,
-    canvPrintName, Logs, doPDF, AddNorm, X1,X2,Y1,Y2, YStretch);
+    canvPrintName, Logs, doPDF, AddNorm, X1,X2,Y1,Y2, YStretch, XWidth, YWidth);
 
   bool ExpectingDenom = false;
   size_t FoundNQuadRatios = 0;
@@ -528,12 +549,11 @@ void AddCanvasDescriptionXML(TXMLEngine &xmlengine,
   AutoPlots.push_back(pd);
 }
 
-
 TCanvas* AutoPlots____RollOut(PlotDescriptor const &plot){
 
   style::SetGlobalStyle();
 
-  TCanvas* canv = new TCanvas(plot.Name.c_str(),"",600,400);
+  TCanvas* canv = new TCanvas(plot.Name.c_str(),"",plot.XWidth,plot.YWidth);
 
   style::fgkYTitleOffset = 1.1;
   TGaxis::SetMaxDigits(3);
