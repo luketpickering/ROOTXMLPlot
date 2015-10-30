@@ -16,12 +16,12 @@ TARGETSRC := $(TARGET:.exe=.cxx)
 ROOTCFLAGS := `$(RC) --cflags`
 ROOTLDFLAGS := `$(RC) --libs --glibs` -lXMLIO
 
-UTILSLOC=../utils
-LIBUTILS=libPureGenUtils.so
-UTILSDEPSO:=$(UTILSLOC)/lib/$(LIBUTILS)
+UTILSLOC := ../utils
+LIBUTILS := $(UTILSLOC)/lib/libPureGenUtils.a
+LIBUTILSLD := -L$(UTILSLOC)/lib -lPureGenUtils
 
 CXXFLAGS := -fPIC $(ROOTCFLAGS) -g -std=c++11 -Wall -I$(UTILSLOC)
-LDFLAGS := $(ROOTLDFLAGS) -Wl,-rpath=.
+LDFLAGS := $(ROOTLDFLAGS)  $(LIBUTILSLD) -Wl,-rpath=.
 
 .PHONY: all clean
 
@@ -30,16 +30,14 @@ all: $(TARGET)
 	@echo "*********************************************************************"
 	@echo "Success. Built plotting."
 	@echo "*********************************************************************"
-	mkdir -p $(BDIR) $(LDIR)
+	mkdir -p $(BDIR)
 	mv $(TARGET) $(BDIR)/
-	mv $(UTILSDEPSO) $(LDIR)/
 
-$(TARGET): $(TARGETSRC) $(TOBJ) $(TOBJH) $(LIBUTILS)
-	$(CXX) -o $@ $(CXXFLAGS) $(LDFLAGS) $(TARGETSRC) $(TOBJ) $(LIBUTILS)
+$(TARGET): $(TARGETSRC) $(TOBJ) $(TOBJH)
+	$(CXX) -o $@ $(CXXFLAGS) $(TARGETSRC) $(TOBJ) $(LDFLAGS)
 
 $(LIBUTILS):
 	cd $(UTILSLOC); $(MAKE)
-	ln -s `readlink -f $(UTILSDEPSO)` $@
 
 PlottingUtils.o: PlottingUtils.cxx PlottingUtils.hxx PlottingTypes.hxx
 	$(CXX) $(CXXFLAGS) -c PlottingUtils.cxx -o $@
@@ -57,8 +55,9 @@ style_Xianguo.o: style_Xianguo.cxx style_Xianguo.hxx
 	$(CXX) $(CXXFLAGS) -c style_Xianguo.cxx -o $@
 
 clean:
-	rm -rf $(TOBJ)\
+	rm -f $(TOBJ)\
         $(TARGET)\
-        $(BDIR) \
-        $(LDIR)
+
+distclean: clean
+	rm -rf $(BDIR) \
 	cd $(UTILSLOC); $(MAKE) clean
