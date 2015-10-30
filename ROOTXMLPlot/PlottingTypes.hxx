@@ -303,6 +303,7 @@ namespace PlottingTypes {
     bool HaveXYMargins;
     Float_t X1,X2,Y1,Y2;
     Float_t YStretch;
+    Int_t XWidth,YWidth;
 
     PlotDescriptor(std::string const &name,
       std::string const &title,
@@ -313,7 +314,8 @@ namespace PlottingTypes {
       bool addNormToTitle=false,
       Float_t X1=0xdeadbeef, Float_t X2=0xdeadbeef,
       Float_t Y1=0xdeadbeef, Float_t Y2=0xdeadbeef,
-      Float_t yStretch=0xDEADDEAD){
+      Float_t yStretch=0xDEADDEAD,
+      Int_t xWidth=600,Int_t yWidth=400){
 
       Name = name;
       Title = title;
@@ -324,6 +326,8 @@ namespace PlottingTypes {
       DoPDF = doPDF;
       AddNormToTitle = addNormToTitle;
       YStretch = yStretch;
+      XWidth = xWidth;
+      YWidth = yWidth;
 
       HaveXYMargins = false;
       if(X1 != 0xdeadbeef){
